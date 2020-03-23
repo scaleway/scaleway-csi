@@ -1,0 +1,17 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: my-awesome-block-volume-app
+spec:
+  containers:
+    - name: my-busybox
+      image: busybox
+      volumeDevices:
+      - name: my-block-volume
+        devicePath: "/dev/xvda"
+      command: ["/bin/sh", "-c"]
+      args: ["tail -f /dev/null"]
+  volumes:
+    - name: my-block-volume
+      persistentVolumeClaim:
+        claimName: my-awesome-block-volume

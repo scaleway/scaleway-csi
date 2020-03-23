@@ -1,0 +1,45 @@
+name: release
+on:
+  push:
+    tags:
+      - '*'
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Unshallow
+        run: git fetch --prune --unshallow
+      - name: Highest tag
+        id: highestTag
+        run: |
+          git fetch --depth=1 origin +refs/tags/*:refs/tags/*
+          echo ::set-output name=highest::$(git tag | grep -E "^v?([0-9]+\.)+[0-9]+$" | sort -r -V | head -n1)
+      - name: Enable experimental on dockerd
+        run: |
+          echo $'{\n    "experimental": true\n}' | sudo tee /etc/docker/daemon.json
+          sudo service docker restart
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: crazy-max/ghaction-docker-buildx@v1
+        with:
+          version: latest
+      - name: Docker login
+        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
+      - name: Get tag
+        uses: olegtarasov/get-tag@v1
+        id: tagName
+      - name: Make release
+        run: make release
+        env:
+          DOCKER_CLI_EXPERIMENTAL: enabled
+          TAG: ${{ steps.tagName.outputs.tag }}
+          IMAGE_TAG: ${{ steps.tagName.outputs.tag }}
+      - name: Push latest
+        if: steps.tagName.outputs.tag == steps.highestTag.outputs.highest
+        run: make release
+        env:
+          DOCKER_CLI_EXPERIMENTAL: enabled
+          TAG: ${{ steps.tagName.outputs.tag }}
+          IMAGE_TAG: latest

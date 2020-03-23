@@ -1,0 +1,17 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: my-app-with-imported-volume
+spec:
+  containers:
+    - name: my-busybox
+      image: busybox
+      volumeMounts:
+      - name: my-imported-volume
+        mountPath: "/data"
+      command: ["/bin/sh", "-c"]
+      args: ["tail -f /dev/null"]
+  volumes:
+    - name: my-imported-volume
+      persistentVolumeClaim:
+        claimName: my-imported-pvc

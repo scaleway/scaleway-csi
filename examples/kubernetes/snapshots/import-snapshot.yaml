@@ -1,0 +1,8 @@
+apiVersion: snapshot.storage.k8s.io/v1beta1
+kind: VolumeSnapshot
+metadata:
+  name: my-imported-snapshot
+spec:
+  volumeSnapshotClassName: scw-snapshot
+  source:
+    volumeSnapshotContentName: my-imported-snapshot-content
