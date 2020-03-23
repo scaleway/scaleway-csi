@@ -19,6 +19,7 @@ A clear and concise description of what you expected to happen.
 **Details (please complete the following information):**
  - Scaleway CSI version:
  - Platform:
+ - Orchestrator and its version:
 
 **Additional context**
 Add any other context about the problem here.
