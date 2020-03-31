@@ -11,7 +11,7 @@ const (
 	// MinimumVolumeSizeInBytes represents the size of the smallest block volume on Scaleway
 	MinimumVolumeSizeInBytes int64 = 1 * 1000 * 1000 * 1000
 	// MaximumVolumeSizeInBytes represents the size of the biggest block volume on Scaleway
-	MaximumVolumeSizeInBytes int64 = 1 * 1000 * 1000 * 1000 * 1000
+	MaximumVolumeSizeInBytes int64 = 10 * 1000 * 1000 * 1000 * 1000
 	// MaxVolumesPerNode represents the number max of volumes attached to one node
 	MaxVolumesPerNode = 16
 
