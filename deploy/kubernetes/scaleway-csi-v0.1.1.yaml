@@ -73,10 +73,6 @@ spec:
             - "--v=2"
             - "--csi-address=$(CSI_ADDRESS)"
             - "--kubelet-registration-path=$(KUBELET_REGISTRATION_PATH)"
-          lifecycle:
-            preStop:
-              exec:
-                command: ["/bin/sh", "-c", "rm -rf /registration/csi.scaleway.com-reg.sock /csi/csi.sock"]
           env:
             - name: CSI_ADDRESS
               value: /csi/csi.sock
