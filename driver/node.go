@@ -472,7 +472,7 @@ func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		MaxVolumesPerNode: maxVolumesPerNode - 1, // One is already used by the l_ssd root volume
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{
-				zoneTopologyKey: d.nodeZone.String(),
+				ZoneTopologyKey: d.nodeZone.String(),
 			},
 		},
 	}, nil

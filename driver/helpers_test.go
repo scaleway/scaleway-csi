@@ -165,7 +165,7 @@ func Test_chooseZones(t *testing.T) {
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 				},
@@ -179,14 +179,14 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 				},
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 				},
@@ -200,19 +200,19 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 				},
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar2),
+							ZoneTopologyKey: string(scw.ZoneFrPar2),
 						},
 					},
 				},
@@ -226,24 +226,24 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar2),
+							ZoneTopologyKey: string(scw.ZoneFrPar2),
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 				},
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar2),
+							ZoneTopologyKey: string(scw.ZoneFrPar2),
 						},
 					},
 				},
@@ -257,24 +257,24 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: "fr-par-4",
+							ZoneTopologyKey: "fr-par-4",
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: "fr-par-3",
+							ZoneTopologyKey: "fr-par-3",
 						},
 					},
 				},
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: "fr-par-4",
+							ZoneTopologyKey: "fr-par-4",
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: "fr-par-3",
+							ZoneTopologyKey: "fr-par-3",
 						},
 					},
 				},
@@ -288,14 +288,14 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: "fr-ams",
+							ZoneTopologyKey: "fr-ams",
 						},
 					},
 				},
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: "fr-par",
+							ZoneTopologyKey: "fr-par",
 						},
 					},
 				},
@@ -330,7 +330,7 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 				},
@@ -344,19 +344,19 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 				},
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar2),
+							ZoneTopologyKey: string(scw.ZoneFrPar2),
 						},
 					},
 				},
@@ -370,19 +370,19 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 				},
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 				},
@@ -396,24 +396,24 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar2),
+							ZoneTopologyKey: string(scw.ZoneFrPar2),
 						},
 					},
 				},
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar2),
+							ZoneTopologyKey: string(scw.ZoneFrPar2),
 						},
 					},
 				},
@@ -427,24 +427,24 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar2),
+							ZoneTopologyKey: string(scw.ZoneFrPar2),
 						},
 					},
 				},
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar2),
+							ZoneTopologyKey: string(scw.ZoneFrPar2),
 						},
 					},
 				},
@@ -458,26 +458,26 @@ func Test_chooseZones(t *testing.T) {
 				Preferred: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar2),
+							ZoneTopologyKey: string(scw.ZoneFrPar2),
 						},
 					},
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar1),
+							ZoneTopologyKey: string(scw.ZoneFrPar1),
 						},
 					},
 				},
 				Requisite: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							zoneTopologyKey: string(scw.ZoneFrPar2),
+							ZoneTopologyKey: string(scw.ZoneFrPar2),
 						},
 					},
 				},
 			},
 			zone:     scw.Zone(""),
 			expected: nil,
-			err:      status.Errorf(codes.InvalidArgument, "%s: %s is specified in preferred but not in requisite", zoneTopologyKey, scw.ZoneFrPar1),
+			err:      status.Errorf(codes.InvalidArgument, "%s: %s is specified in preferred but not in requisite", ZoneTopologyKey, scw.ZoneFrPar1),
 		},
 	}
 
