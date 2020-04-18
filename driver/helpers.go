@@ -55,10 +55,10 @@ func chooseZones(accessibilityRequirements *csi.TopologyRequirement, snapshotZon
 			topologyKeys := req.GetSegments()
 			for topologyKey, topologyValue := range topologyKeys {
 				switch topologyKey {
-				case zoneTopologyKey:
+				case ZoneTopologyKey:
 					zone, err := scw.ParseZone(topologyValue)
 					if err != nil {
-						klog.Warningf("the given value for requisite %s: %s is not a valid zone", zoneTopologyKey, topologyValue)
+						klog.Warningf("the given value for requisite %s: %s is not a valid zone", ZoneTopologyKey, topologyValue)
 						continue
 					}
 					if snapshotZone == scw.Zone("") || snapshotZone == zone {
@@ -76,10 +76,10 @@ func chooseZones(accessibilityRequirements *csi.TopologyRequirement, snapshotZon
 			topologyKeys := pref.GetSegments()
 			for topologyKey, topologyValue := range topologyKeys {
 				switch topologyKey {
-				case zoneTopologyKey:
+				case ZoneTopologyKey:
 					zone, err := scw.ParseZone(topologyValue)
 					if err != nil {
-						klog.Warningf("the given value for preferred %s: %s is not a valid zone", zoneTopologyKey, topologyValue)
+						klog.Warningf("the given value for preferred %s: %s is not a valid zone", ZoneTopologyKey, topologyValue)
 						continue
 					}
 					if snapshotZone == scw.Zone("") || snapshotZone == zone {
@@ -212,7 +212,7 @@ func getVolumeRequestCapacity(capacityRange *csi.CapacityRange) (int64, error) {
 func newAccessibleTopology(zone scw.Zone) []*csi.Topology {
 	return []*csi.Topology{
 		{
-			Segments: map[string]string{zoneTopologyKey: zone.String()},
+			Segments: map[string]string{ZoneTopologyKey: zone.String()},
 		},
 	}
 }

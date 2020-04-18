@@ -186,7 +186,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		segments := map[string]string{
-			zoneTopologyKey: string(volumeResp.Volume.Zone),
+			ZoneTopologyKey: string(volumeResp.Volume.Zone),
 		}
 
 		return &csi.CreateVolumeResponse{
@@ -213,7 +213,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 
 		segments := map[string]string{
-			zoneTopologyKey: string(volumeResp.Volume.Zone),
+			ZoneTopologyKey: string(volumeResp.Volume.Zone),
 		}
 
 		return &csi.CreateVolumeResponse{

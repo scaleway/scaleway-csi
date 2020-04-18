@@ -19,7 +19,7 @@ import (
 const (
 	// DriverName is the official name for the Scaleway CSI plugin
 	DriverName      = "csi.scaleway.com"
-	zoneTopologyKey = "topology." + DriverName + "/zone"
+	ZoneTopologyKey = "topology." + DriverName + "/zone"
 )
 
 // Mode represents the mode in which the CSI driver started
