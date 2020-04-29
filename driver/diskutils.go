@@ -104,7 +104,15 @@ func (d *diskUtils) formatDevice(devicePath string, fsType string) error {
 		return err
 	}
 
-	mkfsArgs := []string{"-m", "0", devicePath}
+	mkfsArgs := []string{devicePath}
+	if fsType == "ext4" || fsType == "ext3" {
+		mkfsArgs = []string{
+			"-F",  // Force mke2fs to create a filesystem
+			"-m0", // 0 blocks reserved for the super-user
+			devicePath,
+		}
+	}
+
 	return exec.Command(mkfsPath, mkfsArgs...).Run()
 }
 
