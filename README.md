@@ -75,7 +75,7 @@ $ kubectl apply -f ./deploy/kubernetes/scaleway-secret.yaml
 
 It's recommended to deploy the latest tagged version, but you can also deploy the master version. Here we will deploy the latest version `0.1.0`.
 ```bash
-$ kubectl apply -f ./deploy/kubernetes/scaleway-csi-v0.1.0.yaml
+$ kubectl create -f ./deploy/kubernetes/scaleway-csi-v0.1.0.yaml
 ```
 
 You can now verify that the driver is running:
