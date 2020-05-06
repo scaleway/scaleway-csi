@@ -80,6 +80,9 @@ type InstanceAPI interface {
 	// GetServer is an interface for the SDK GetServer method
 	GetServer(req *instance.GetServerRequest, opts ...scw.RequestOption) (*instance.GetServerResponse, error)
 
+	// UpdateVolume is an interface for the SDK UpdateVolume method
+	UpdateVolume(req *instance.UpdateVolumeRequest, opts ...scw.RequestOption) (*instance.UpdateVolumeResponse, error)
+
 	// AttachVolume is an interface for the SDK AttachVolume method
 	AttachVolume(req *instance.AttachVolumeRequest, opts ...scw.RequestOption) (*instance.AttachVolumeResponse, error)
 

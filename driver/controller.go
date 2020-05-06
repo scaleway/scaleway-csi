@@ -25,6 +25,7 @@ var (
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
 		csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
+		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	}
 
 	// supportedAccessModes represents the supported access modes for the Scaleway Block Volumes
@@ -620,6 +621,7 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 // DeleteSnapshot deletes the given snapshot
 func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
+	klog.V(4).Infof("DeleteSnapshot called with %+v", *req)
 	snapshotID, snapshotZone, err := getSnapshotIDAndZone(req.GetSnapshotId())
 	if err != nil {
 		return nil, err
@@ -646,6 +648,7 @@ func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 // they were created. ListSnapshots SHALL NOT list a snapshot that
 // is being created but has not been cut successfully yet.
 func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+	klog.V(4).Infof("ListSnapshots called with %+v", *req)
 	var numberResults int
 	var err error
 
@@ -722,6 +725,56 @@ func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 // ControllerExpandVolume expands the given volume
 func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	klog.V(4).Infof("ControllerExpandVolume is not yet implemented")
-	return nil, status.Error(codes.Unimplemented, "ControllerExpandVolume is not yet implemented")
+	klog.V(4).Infof("ControllerExpandVolume called with %+v", *req)
+	volumeID, volumeZone, err := getVolumeIDAndZone(req.GetVolumeId())
+	if err != nil {
+		return nil, err
+	}
+
+	nodeExpansionRequired := true
+
+	volumeCapability := req.GetVolumeCapability()
+	if volumeCapability != nil {
+		err := validateVolumeCapability(volumeCapability)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "volumeCapabilities not supported: %s", err)
+		}
+		switch volumeCapability.GetAccessType().(type) {
+		case *csi.VolumeCapability_Block:
+			nodeExpansionRequired = false
+		}
+	}
+
+	newSize, err := getVolumeRequestCapacity(req.GetCapacityRange())
+	if err != nil {
+		return nil, status.Errorf(codes.OutOfRange, "capacityRange invalid: %s", err)
+	}
+
+	volumeResp, err := d.scaleway.GetVolume(&instance.GetVolumeRequest{
+		VolumeID: volumeID,
+		Zone:     volumeZone,
+	})
+	if err != nil {
+		if ferr, ok := err.(*scw.ResponseError); ok {
+			if ferr.StatusCode == 404 {
+				return nil, status.Errorf(codes.NotFound, "volume %s not found", volumeID)
+			}
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if newSize < int64(volumeResp.Volume.Size) {
+		return nil, status.Error(codes.InvalidArgument, "the new size of the volume will be less than the actual size")
+	}
+
+	_, err = d.scaleway.UpdateVolume(&instance.UpdateVolumeRequest{
+		Zone:     volumeZone,
+		VolumeID: volumeID,
+		// TODO bump sdk and change size
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &csi.ControllerExpandVolumeResponse{CapacityBytes: newSize, NodeExpansionRequired: nodeExpansionRequired}, nil
 }
