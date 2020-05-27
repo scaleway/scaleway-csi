@@ -109,7 +109,7 @@ type InstanceAPI interface {
 func (s *Scaleway) GetVolumeByName(name string, size int64, volumeType instance.VolumeType) (*instance.Volume, error) {
 	volumesResp, err := s.ListVolumes(&instance.ListVolumesRequest{
 		Name:       &name,
-		VolumeType: volumeType,
+		VolumeType: &volumeType,
 	}, scw.WithAllPages())
 	if err != nil {
 		return nil, err
