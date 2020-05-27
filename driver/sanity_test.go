@@ -224,6 +224,13 @@ func (s *fakeHelper) DetachVolume(req *instance.DetachVolumeRequest, opts ...scw
 	return nil, &scw.ResponseError{StatusCode: 404}
 }
 
+func (s *fakeHelper) WaitForVolume(req *instance.WaitForVolumeRequest) (*instance.Volume, error) {
+	if vol, ok := s.volumesMap[req.VolumeID]; ok {
+		return vol, nil
+	}
+	return nil, &scw.ResponseError{StatusCode: 404}
+}
+
 func (s *fakeHelper) GetSnapshot(req *instance.GetSnapshotRequest, opts ...scw.RequestOption) (*instance.GetSnapshotResponse, error) {
 	snapshot, ok := s.snapshotsMap[req.SnapshotID]
 	if !ok {

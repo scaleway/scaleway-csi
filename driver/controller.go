@@ -770,10 +770,20 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 	_, err = d.scaleway.UpdateVolume(&instance.UpdateVolumeRequest{
 		Zone:     volumeZone,
 		VolumeID: volumeID,
-		// TODO bump sdk and change size
+		Size:     scw.SizePtr(scw.Size(newSize)),
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	vol, err := d.scaleway.WaitForVolume(&instance.WaitForVolumeRequest{
+		VolumeID: volumeID,
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if vol.State != instance.VolumeStateAvailable {
+		return nil, status.Errorf(codes.Internal, "volume %s is in state %s", volumeID, vol.State)
 	}
 
 	return &csi.ControllerExpandVolumeResponse{CapacityBytes: newSize, NodeExpansionRequired: nodeExpansionRequired}, nil
