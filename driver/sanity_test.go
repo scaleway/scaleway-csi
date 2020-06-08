@@ -105,8 +105,8 @@ func (s *fakeHelper) ListVolumesTypes(req *instance.ListVolumesTypesRequest, opt
 		Volumes: map[string]*instance.VolumeType{
 			instance.VolumeVolumeTypeBSSD.String(): {
 				Constraints: &instance.VolumeTypeConstraints{
-					MaxSize: 10 * 1000 * 1000 * 1000 * 1000,
-					MinSize: 1 * 1000 * 1000 * 1000,
+					Max: 10 * 1000 * 1000 * 1000 * 1000,
+					Min: 1 * 1000 * 1000 * 1000,
 				},
 			},
 		},
