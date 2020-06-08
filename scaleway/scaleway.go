@@ -112,7 +112,7 @@ func (s *Scaleway) GetVolumeLimits(volumeType string) (int64, int64, error) {
 	}
 
 	if spec, ok := volumeTypes.Volumes[volumeType]; ok && spec.Constraints != nil {
-		return int64(spec.Constraints.MinSize), int64(spec.Constraints.MaxSize), nil
+		return int64(spec.Constraints.Min), int64(spec.Constraints.Max), nil
 	}
 
 	return 0, 0, fmt.Errorf("volume type %s not found", volumeType)
