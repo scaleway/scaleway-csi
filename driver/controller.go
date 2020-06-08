@@ -75,19 +75,24 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.InvalidArgument, "volumeCapabilities not supported: %s", err)
 	}
 
-	size, err := getVolumeRequestCapacity(req.GetCapacityRange())
-	if err != nil {
-		return nil, status.Errorf(codes.OutOfRange, "capacityRange invalid: %s", err)
-	}
-
 	volumeType := scaleway.DefaultVolumeType
 	for key, value := range req.GetParameters() {
 		switch strings.ToLower(key) {
 		case volumeTypeKey:
-			volumeType = instance.VolumeType(value)
+			volumeType = instance.VolumeVolumeType(value)
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter key %s", key)
 		}
+	}
+
+	minSize, maxSize, err := d.scaleway.GetVolumeLimits(string(volumeType))
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	size, err := getVolumeRequestCapacity(minSize, maxSize, req.GetCapacityRange())
+	if err != nil {
+		return nil, status.Errorf(codes.OutOfRange, "capacityRange invalid: %s", err)
 	}
 
 	scwVolumeName := d.config.Prefix + volumeName
@@ -136,10 +141,8 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 			Zone:       sourceSnapshotZone,
 		})
 		if err != nil {
-			if ferr, ok := err.(*scw.ResponseError); ok {
-				if ferr.StatusCode == 404 {
-					return nil, status.Error(codes.NotFound, err.Error())
-				}
+			if _, ok := err.(*scw.ResourceNotFoundError); ok {
+				return nil, status.Errorf(codes.NotFound, "snapshot %s not found", sourceSnapshotID)
 			}
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -179,10 +182,8 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 		volumeResp, err := d.scaleway.CreateVolume(volumeRequest)
 		if err != nil {
-			if ferr, ok := err.(*scw.ResponseError); ok {
-				if ferr.StatusCode == 404 {
-					return nil, status.Error(codes.NotFound, err.Error())
-				}
+			if _, ok := err.(*scw.ResourceNotFoundError); ok {
+				return nil, status.Error(codes.NotFound, err.Error())
 			}
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -249,12 +250,11 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		Zone:     volumeZone,
 	})
 	if err != nil {
-		if ferr, ok := err.(*scw.ResponseError); ok {
-			if ferr.StatusCode == 404 {
-				klog.V(4).Infof("volume with ID %s not found", volumeID)
-				return &csi.DeleteVolumeResponse{}, nil
-			}
+		if _, ok := err.(*scw.ResourceNotFoundError); ok {
+			klog.V(4).Infof("volume with ID %s not found", volumeID)
+			return &csi.DeleteVolumeResponse{}, nil
 		}
+
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if volumeResp.Volume.Server != nil {
@@ -267,12 +267,11 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		Zone:     volumeResp.Volume.Zone,
 	})
 	if err != nil {
-		if ferr, ok := err.(*scw.ResponseError); ok {
-			if ferr.StatusCode == 404 {
-				klog.V(4).Infof("volume with ID %s not found", volumeID)
-				return &csi.DeleteVolumeResponse{}, nil
-			}
+		if _, ok := err.(*scw.ResourceNotFoundError); ok {
+			klog.V(4).Infof("volume with ID %s not found", volumeID)
+			return &csi.DeleteVolumeResponse{}, nil
 		}
+
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	klog.V(4).Infof("volume with ID %s deleted", volumeID)
@@ -309,10 +308,8 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 		Zone:     volumeZone,
 	})
 	if err != nil {
-		if ferr, ok := err.(*scw.ResponseError); ok {
-			if ferr.StatusCode == 404 {
-				return nil, status.Errorf(codes.NotFound, "volume %s not found", volumeID)
-			}
+		if _, ok := err.(*scw.ResourceNotFoundError); ok {
+			return nil, status.Errorf(codes.NotFound, "volume %s not found", volumeID)
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -322,10 +319,8 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 		Zone:     nodeZone,
 	})
 	if err != nil {
-		if ferr, ok := err.(*scw.ResponseError); ok {
-			if ferr.StatusCode == 404 {
-				return nil, status.Errorf(codes.NotFound, "node %s not found", nodeID)
-			}
+		if _, ok := err.(*scw.ResourceNotFoundError); ok {
+			return nil, status.Errorf(codes.NotFound, "instance %s not found", volumeID)
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -392,10 +387,8 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 		Zone:     volumeZone,
 	})
 	if err != nil {
-		if ferr, ok := err.(*scw.ResponseError); ok {
-			if ferr.StatusCode == 404 {
-				return &csi.ControllerUnpublishVolumeResponse{}, nil
-			}
+		if _, ok := err.(*scw.ResourceNotFoundError); ok {
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -409,10 +402,8 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 		Zone:     nodeZone,
 	})
 	if err != nil {
-		if ferr, ok := err.(*scw.ResponseError); ok {
-			if ferr.StatusCode == 404 {
-				return &csi.ControllerUnpublishVolumeResponse{}, nil
-			}
+		if _, ok := err.(*scw.ResourceNotFoundError); ok {
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -451,11 +442,10 @@ func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req 
 		Zone:     volumeZone,
 	})
 	if err != nil {
-		if ferr, ok := err.(*scw.ResponseError); ok {
-			if ferr.StatusCode == 404 {
-				return nil, status.Errorf(codes.NotFound, "volume %s not found", volumeID)
-			}
+		if _, ok := err.(*scw.ResourceNotFoundError); ok {
+			return nil, status.Errorf(codes.NotFound, "volume %s not found", volumeID)
 		}
+
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	// TODO check stuff
@@ -632,12 +622,11 @@ func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 		Zone:       snapshotZone,
 	})
 	if err != nil {
-		if ferr, ok := err.(*scw.ResponseError); ok {
-			if ferr.StatusCode == 404 {
-				klog.V(4).Infof("snapshot with ID %s not found", snapshotID)
-				return &csi.DeleteSnapshotResponse{}, nil
-			}
+		if _, ok := err.(*scw.ResourceNotFoundError); ok {
+			klog.V(4).Infof("snapshot with ID %s not found", snapshotID)
+			return &csi.DeleteSnapshotResponse{}, nil
 		}
+
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &csi.DeleteSnapshotResponse{}, nil
@@ -745,22 +734,25 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 		}
 	}
 
-	newSize, err := getVolumeRequestCapacity(req.GetCapacityRange())
-	if err != nil {
-		return nil, status.Errorf(codes.OutOfRange, "capacityRange invalid: %s", err)
-	}
-
 	volumeResp, err := d.scaleway.GetVolume(&instance.GetVolumeRequest{
 		VolumeID: volumeID,
 		Zone:     volumeZone,
 	})
 	if err != nil {
-		if ferr, ok := err.(*scw.ResponseError); ok {
-			if ferr.StatusCode == 404 {
-				return nil, status.Errorf(codes.NotFound, "volume %s not found", volumeID)
-			}
+		if _, ok := err.(*scw.ResourceNotFoundError); ok {
+			return nil, status.Errorf(codes.NotFound, "volume %s not found", volumeID)
 		}
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	minSize, maxSize, err := d.scaleway.GetVolumeLimits(string(volumeResp.Volume.VolumeType))
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	newSize, err := getVolumeRequestCapacity(minSize, maxSize, req.GetCapacityRange())
+	if err != nil {
+		return nil, status.Errorf(codes.OutOfRange, "capacityRange invalid: %s", err)
 	}
 
 	if newSize < int64(volumeResp.Volume.Size) {

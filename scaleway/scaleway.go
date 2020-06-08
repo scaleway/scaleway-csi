@@ -2,21 +2,18 @@ package scaleway
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 )
 
 const (
-	// MinimumVolumeSizeInBytes represents the size of the smallest block volume on Scaleway
-	MinimumVolumeSizeInBytes int64 = 1 * 1000 * 1000 * 1000
-	// MaximumVolumeSizeInBytes represents the size of the biggest block volume on Scaleway
-	MaximumVolumeSizeInBytes int64 = 10 * 1000 * 1000 * 1000 * 1000
 	// MaxVolumesPerNode represents the number max of volumes attached to one node
 	MaxVolumesPerNode = 16
 
 	// DefaultVolumeType is the default type for Scaleway Block volumes
-	DefaultVolumeType = instance.VolumeTypeBSSD
+	DefaultVolumeType = instance.VolumeVolumeTypeBSSD
 )
 
 var (
@@ -103,10 +100,26 @@ type InstanceAPI interface {
 
 	// DeleteSnapshot is an interface for the SDK CreateSnapshot method
 	DeleteSnapshot(req *instance.DeleteSnapshotRequest, opts ...scw.RequestOption) error
+
+	// ListVolumesTypes is an interface for the SDK ListVolumesTypes method
+	ListVolumesTypes(req *instance.ListVolumesTypesRequest, opts ...scw.RequestOption) (*instance.ListVolumesTypesResponse, error)
+}
+
+func (s *Scaleway) GetVolumeLimits(volumeType string) (int64, int64, error) {
+	volumeTypes, err := s.ListVolumesTypes(&instance.ListVolumesTypesRequest{})
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if spec, ok := volumeTypes.Volumes[volumeType]; ok && spec.Constraints != nil {
+		return int64(spec.Constraints.MinSize), int64(spec.Constraints.MaxSize), nil
+	}
+
+	return 0, 0, fmt.Errorf("volume type %s not found", volumeType)
 }
 
 // GetVolumeByName is a helper to find a volume by it's name, type and given size
-func (s *Scaleway) GetVolumeByName(name string, size int64, volumeType instance.VolumeType) (*instance.Volume, error) {
+func (s *Scaleway) GetVolumeByName(name string, size int64, volumeType instance.VolumeVolumeType) (*instance.Volume, error) {
 	volumesResp, err := s.ListVolumes(&instance.ListVolumesRequest{
 		Name:       &name,
 		VolumeType: &volumeType,

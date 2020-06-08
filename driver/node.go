@@ -464,6 +464,13 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 					},
 				},
 			},
+			&csi.NodeServiceCapability{
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+					},
+				},
+			},
 		},
 	}, nil
 }

@@ -33,7 +33,7 @@ func TestSanityCSI(t *testing.T) {
 			ID: nodeID,
 			Volumes: map[string]*instance.Volume{"fb094b6a-b73b-4d5f-8283-bd6726ff5938": {
 				ID:         "fb094b6a-b73b-4d5f-8283-bd6726ff5938",
-				VolumeType: instance.VolumeTypeLSSD,
+				VolumeType: instance.VolumeVolumeTypeLSSD,
 				Zone:       scw.ZoneFrPar1,
 				Name:       "local",
 			}},
@@ -100,6 +100,19 @@ type fakeInstanceAPI struct {
 	defaultZone  scw.Zone
 }
 
+func (s *fakeHelper) ListVolumesTypes(req *instance.ListVolumesTypesRequest, opts ...scw.RequestOption) (*instance.ListVolumesTypesResponse, error) {
+	return &instance.ListVolumesTypesResponse{
+		Volumes: map[string]*instance.VolumeType{
+			instance.VolumeVolumeTypeBSSD.String(): {
+				Constraints: &instance.VolumeTypeConstraints{
+					MaxSize: 10 * 1000 * 1000 * 1000 * 1000,
+					MinSize: 1 * 1000 * 1000 * 1000,
+				},
+			},
+		},
+	}, nil
+}
+
 func (s *fakeHelper) ListVolumes(req *instance.ListVolumesRequest, opts ...scw.RequestOption) (*instance.ListVolumesResponse, error) {
 	volumes := make([]*instance.Volume, 0)
 	for _, v := range s.volumesMap {
@@ -123,13 +136,13 @@ func (s *fakeHelper) CreateVolume(req *instance.CreateVolumeRequest, opts ...scw
 	} else if req.BaseVolume != nil {
 		baseVol, ok := s.volumesMap[*req.BaseVolume]
 		if !ok {
-			return nil, &scw.ResponseError{StatusCode: 404}
+			return nil, &scw.ResourceNotFoundError{}
 		}
 		volume.Size = baseVol.Size
 	} else if req.BaseSnapshot != nil {
 		baseSnap, ok := s.snapshotsMap[*req.BaseSnapshot]
 		if !ok {
-			return nil, &scw.ResponseError{StatusCode: 404}
+			return nil, &scw.ResourceNotFoundError{}
 		}
 		volume.Size = baseSnap.Size
 	} else {
@@ -146,13 +159,13 @@ func (s *fakeHelper) GetVolume(req *instance.GetVolumeRequest, opts ...scw.Reque
 	if vol, ok := s.volumesMap[req.VolumeID]; ok {
 		return &instance.GetVolumeResponse{Volume: vol}, nil
 	}
-	return nil, &scw.ResponseError{StatusCode: 404}
+	return nil, &scw.ResourceNotFoundError{}
 }
 
 func (s *fakeHelper) UpdateVolume(req *instance.UpdateVolumeRequest, opts ...scw.RequestOption) (*instance.UpdateVolumeResponse, error) {
 	vol, ok := s.volumesMap[req.VolumeID]
 	if !ok {
-		return nil, &scw.ResponseError{StatusCode: 404}
+		return nil, &scw.ResourceNotFoundError{}
 	}
 
 	if req.Name != nil {
@@ -169,14 +182,14 @@ func (s *fakeHelper) DeleteVolume(req *instance.DeleteVolumeRequest, opts ...scw
 		delete(s.volumesMap, req.VolumeID)
 		return nil
 	}
-	return &scw.ResponseError{StatusCode: 404}
+	return &scw.ResourceNotFoundError{}
 }
 
 func (s *fakeHelper) GetServer(req *instance.GetServerRequest, opts ...scw.RequestOption) (*instance.GetServerResponse, error) {
 	if srv, ok := s.serversMap[req.ServerID]; ok {
 		return &instance.GetServerResponse{Server: srv}, nil
 	}
-	return nil, &scw.ResponseError{StatusCode: 404}
+	return nil, &scw.ResourceNotFoundError{}
 }
 
 func (s *fakeHelper) AttachVolume(req *instance.AttachVolumeRequest, opts ...scw.RequestOption) (*instance.AttachVolumeResponse, error) {
@@ -201,7 +214,7 @@ func (s *fakeHelper) AttachVolume(req *instance.AttachVolumeRequest, opts ...scw
 			return &instance.AttachVolumeResponse{Server: srv}, nil
 		}
 	}
-	return nil, &scw.ResponseError{StatusCode: 404}
+	return nil, &scw.ResourceNotFoundError{}
 }
 
 func (s *fakeHelper) DetachVolume(req *instance.DetachVolumeRequest, opts ...scw.RequestOption) (*instance.DetachVolumeResponse, error) {
@@ -221,20 +234,20 @@ func (s *fakeHelper) DetachVolume(req *instance.DetachVolumeRequest, opts ...scw
 
 		return &instance.DetachVolumeResponse{}, nil
 	}
-	return nil, &scw.ResponseError{StatusCode: 404}
+	return nil, &scw.ResourceNotFoundError{}
 }
 
 func (s *fakeHelper) WaitForVolume(req *instance.WaitForVolumeRequest) (*instance.Volume, error) {
 	if vol, ok := s.volumesMap[req.VolumeID]; ok {
 		return vol, nil
 	}
-	return nil, &scw.ResponseError{StatusCode: 404}
+	return nil, &scw.ResourceNotFoundError{}
 }
 
 func (s *fakeHelper) GetSnapshot(req *instance.GetSnapshotRequest, opts ...scw.RequestOption) (*instance.GetSnapshotResponse, error) {
 	snapshot, ok := s.snapshotsMap[req.SnapshotID]
 	if !ok {
-		return nil, &scw.ResponseError{StatusCode: 404}
+		return nil, &scw.ResourceNotFoundError{}
 	}
 	return &instance.GetSnapshotResponse{
 		Snapshot: snapshot,
@@ -261,7 +274,7 @@ func (s *fakeHelper) CreateSnapshot(req *instance.CreateSnapshotRequest, opts ..
 
 	volume, ok := s.volumesMap[req.VolumeID]
 	if !ok {
-		return nil, &scw.ResponseError{StatusCode: 404}
+		return nil, &scw.ResourceNotFoundError{}
 	}
 	snapshot := &instance.Snapshot{}
 	snapshot.ID = uuid.New().String()
@@ -287,7 +300,7 @@ func (s *fakeHelper) DeleteSnapshot(req *instance.DeleteSnapshotRequest, opts ..
 		delete(s.snapshotsMap, req.SnapshotID)
 		return nil
 	}
-	return &scw.ResponseError{StatusCode: 404}
+	return &scw.ResourceNotFoundError{}
 }
 
 type mountpoint struct {

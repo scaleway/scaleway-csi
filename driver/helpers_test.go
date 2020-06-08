@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/scaleway/scaleway-csi/scaleway"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -547,6 +546,8 @@ func Test_validateVolumeCapabilities(t *testing.T) {
 }
 
 func Test_getVolumeRequestCapacity(t *testing.T) {
+	var min int64 = 1000
+	var max int64 = 1000000000
 	testsBench := []struct {
 		capRange *csi.CapacityRange
 		res      int64
@@ -557,28 +558,28 @@ func Test_getVolumeRequestCapacity(t *testing.T) {
 				RequiredBytes: 0,
 				LimitBytes:    0,
 			},
-			res: scaleway.MinimumVolumeSizeInBytes,
+			res: min,
 			err: nil,
 		},
 		{
 			capRange: &csi.CapacityRange{
-				RequiredBytes: scaleway.MinimumVolumeSizeInBytes + 10,
+				RequiredBytes: min + 10,
 				LimitBytes:    0,
 			},
-			res: scaleway.MinimumVolumeSizeInBytes + 10,
+			res: min + 10,
 			err: nil,
 		},
 		{
 			capRange: &csi.CapacityRange{
 				RequiredBytes: 0,
-				LimitBytes:    scaleway.MinimumVolumeSizeInBytes + 10,
+				LimitBytes:    min + 10,
 			},
-			res: scaleway.MinimumVolumeSizeInBytes + 10,
+			res: min + 10,
 			err: nil,
 		},
 		{
 			capRange: &csi.CapacityRange{
-				RequiredBytes: scaleway.MinimumVolumeSizeInBytes - 10,
+				RequiredBytes: min - 10,
 				LimitBytes:    0,
 			},
 			res: 0,
@@ -587,30 +588,30 @@ func Test_getVolumeRequestCapacity(t *testing.T) {
 		{
 			capRange: &csi.CapacityRange{
 				RequiredBytes: 0,
-				LimitBytes:    scaleway.MinimumVolumeSizeInBytes - 10,
+				LimitBytes:    min - 10,
 			},
 			res: 0,
 			err: errLimitBytesLessThanMinimum,
 		},
 		{
 			capRange: &csi.CapacityRange{
-				RequiredBytes: scaleway.MinimumVolumeSizeInBytes + 10,
-				LimitBytes:    scaleway.MinimumVolumeSizeInBytes + 5,
+				RequiredBytes: min + 10,
+				LimitBytes:    min + 5,
 			},
 			res: 0,
 			err: errLimitBytesLessThanRequiredBytes,
 		},
 		{
 			capRange: &csi.CapacityRange{
-				RequiredBytes: scaleway.MinimumVolumeSizeInBytes + 10,
-				LimitBytes:    scaleway.MinimumVolumeSizeInBytes + 5,
+				RequiredBytes: min + 10,
+				LimitBytes:    min + 5,
 			},
 			res: 0,
 			err: errLimitBytesLessThanRequiredBytes,
 		},
 		{
 			capRange: &csi.CapacityRange{
-				RequiredBytes: scaleway.MaximumVolumeSizeInBytes + 10,
+				RequiredBytes: max + 10,
 				LimitBytes:    0,
 			},
 			res: 0,
@@ -619,31 +620,31 @@ func Test_getVolumeRequestCapacity(t *testing.T) {
 		{
 			capRange: &csi.CapacityRange{
 				RequiredBytes: 0,
-				LimitBytes:    scaleway.MaximumVolumeSizeInBytes + 10,
+				LimitBytes:    max + 10,
 			},
 			res: 0,
 			err: errLimitBytesGreaterThanMaximum,
 		},
 		{
 			capRange: &csi.CapacityRange{
-				RequiredBytes: scaleway.MinimumVolumeSizeInBytes + 10,
-				LimitBytes:    scaleway.MinimumVolumeSizeInBytes + 10,
+				RequiredBytes: min + 10,
+				LimitBytes:    min + 10,
 			},
-			res: scaleway.MinimumVolumeSizeInBytes + 10,
+			res: min + 10,
 			err: nil,
 		},
 		{
 			capRange: &csi.CapacityRange{
-				RequiredBytes: scaleway.MinimumVolumeSizeInBytes + 10,
-				LimitBytes:    scaleway.MinimumVolumeSizeInBytes + 20,
+				RequiredBytes: min + 10,
+				LimitBytes:    min + 20,
 			},
-			res: scaleway.MinimumVolumeSizeInBytes + 10,
+			res: min + 10,
 			err: nil,
 		},
 	}
 
 	for _, test := range testsBench {
-		res, err := getVolumeRequestCapacity(test.capRange)
+		res, err := getVolumeRequestCapacity(min, max, test.capRange)
 		Equals(t, test.err, err)
 		Equals(t, test.res, res)
 	}
