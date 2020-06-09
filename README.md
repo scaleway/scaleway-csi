@@ -15,6 +15,10 @@ The [Scaleway Block Volume](https://www.scaleway.com/en/block-storage/) Containe
 
 Here is a list of functionality implemented by the Scaleway CSI driver.
 
+#### Block device resizing
+
+The Scaleway CSI driver implements the resize feature ([example for Kubernetes](https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/)). It allows an online resize (without the need to detach the block device). However resizing can only be done upwards, decreasing a volume's size is not supported.
+
 #### Raw Block Volume
 
 [Raw Block Volumes](https://kubernetes.io/blog/2019/03/07/raw-block-volume-support-to-beta/) allows the block volume to be exposed directly to the container as a block device, instead of a mounted filesystem. To enable it, the `volumeMode` needs to be set to `Block`. For instance, here is a PVC in raw block volume mode:
@@ -43,10 +47,10 @@ The CSI driver allows to use [Persistent Volumes](https://kubernetes.io/docs/con
 
 ### Kubernetes Version Compability Matrix
 
-| Scaleway CSI Driver \ Kubernetes Version | K8S v1.17 |
-|------------------------------------------|-----------|
-| master branch                            | yes       |
-| v0.1.0                                   | yes       |
+| Scaleway CSI Driver \ Kubernetes Version | K8S v1.17 | K8S v1.18 |
+|------------------------------------------|-----------|-----------|
+| master branch                            | yes       | yes       |
+| v0.1.x                                   | yes       | yes       |
 
 ### Examples
 
