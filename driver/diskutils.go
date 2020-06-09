@@ -52,6 +52,9 @@ type DiskUtils interface {
 
 	// GetStatfs return the statfs struct for the given path
 	GetStatfs(path string) (*unix.Statfs_t, error)
+
+	// Resize resizes the given volumes
+	Resize(targetPath string, devicePath string) error
 }
 
 type diskUtils struct{}
@@ -310,4 +313,30 @@ func (d *diskUtils) GetStatfs(path string) (*unix.Statfs_t, error) {
 	fs := &unix.Statfs_t{}
 	err := unix.Statfs(path, fs)
 	return fs, err
+}
+
+func (d *diskUtils) Resize(targetPath string, devicePath string) error {
+	mountInfo, err := d.GetMountInfo(targetPath)
+	if err != nil {
+		return err
+	}
+
+	switch mountInfo.fsType {
+	case "ext3", "ext4":
+		resize2fsPath, err := exec.LookPath("resize2fs")
+		if err != nil {
+			return err
+		}
+		resize2fsArgs := []string{devicePath}
+		return exec.Command(resize2fsPath, resize2fsArgs...).Run()
+	case "xfs":
+		xfsGrowfsPath, err := exec.LookPath("xfs_growfs")
+		if err != nil {
+			return err
+		}
+		xfsGrowfsArgs := []string{"-d", targetPath}
+		return exec.Command(xfsGrowfsPath, xfsGrowfsArgs...).Run()
+	}
+
+	return fmt.Errorf("filesystem %s does not support resizing", mountInfo.fsType)
 }

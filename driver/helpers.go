@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/scaleway/scaleway-csi/scaleway"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -159,9 +158,9 @@ func validateVolumeCapability(volumeCapability *csi.VolumeCapability) error {
 	return errAccessModeNotSupported
 }
 
-func getVolumeRequestCapacity(capacityRange *csi.CapacityRange) (int64, error) {
+func getVolumeRequestCapacity(minSize int64, maxSize int64, capacityRange *csi.CapacityRange) (int64, error) {
 	if capacityRange == nil {
-		return scaleway.MinimumVolumeSizeInBytes, nil
+		return minSize, nil
 	}
 
 	requiredBytes := capacityRange.GetRequiredBytes()
@@ -171,26 +170,26 @@ func getVolumeRequestCapacity(capacityRange *csi.CapacityRange) (int64, error) {
 	limitBytesSet := limitBytes > 0
 
 	if !requiredBytesSet && !limitBytesSet {
-		return scaleway.MinimumVolumeSizeInBytes, nil
+		return minSize, nil
 	}
 
 	if requiredBytesSet && limitBytesSet && limitBytes < requiredBytes {
 		return 0, errLimitBytesLessThanRequiredBytes
 	}
 
-	if requiredBytesSet && !limitBytesSet && requiredBytes < scaleway.MinimumVolumeSizeInBytes {
+	if requiredBytesSet && !limitBytesSet && requiredBytes < minSize {
 		return 0, errRequiredBytesLessThanMinimun
 	}
 
-	if limitBytesSet && limitBytes < scaleway.MinimumVolumeSizeInBytes {
+	if limitBytesSet && limitBytes < minSize {
 		return 0, errLimitBytesLessThanMinimum
 	}
 
-	if requiredBytesSet && requiredBytes > scaleway.MaximumVolumeSizeInBytes {
+	if requiredBytesSet && requiredBytes > maxSize {
 		return 0, errRequiredBytesGreaterThanMaximun
 	}
 
-	if !requiredBytesSet && limitBytesSet && limitBytes > scaleway.MaximumVolumeSizeInBytes {
+	if !requiredBytesSet && limitBytesSet && limitBytes > maxSize {
 		return 0, errLimitBytesGreaterThanMaximum
 	}
 
@@ -206,7 +205,7 @@ func getVolumeRequestCapacity(capacityRange *csi.CapacityRange) (int64, error) {
 		return limitBytes, nil
 	}
 
-	return scaleway.MinimumVolumeSizeInBytes, nil
+	return minSize, nil
 }
 
 func newAccessibleTopology(zone scw.Zone) []*csi.Topology {

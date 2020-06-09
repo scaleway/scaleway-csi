@@ -242,6 +242,9 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	if isMounted {
 		blockDevice, err := d.diskUtils.IsBlockDevice(targetPath)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "error checking stat for %s: %s", targetPath, err.Error())
+		}
 		if blockDevice && volumeCapability.GetMount() != nil || !blockDevice && volumeCapability.GetBlock() != nil {
 			return nil, status.Error(codes.AlreadyExists, "cannot change volumeCapability type")
 		}
@@ -461,6 +464,13 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 					},
 				},
 			},
+			&csi.NodeServiceCapability{
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+					},
+				},
+			},
 		},
 	}, nil
 }
@@ -480,5 +490,52 @@ func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 // NodeExpandVolume expands the given volume
 func (d *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "NodeExpandVolume is not implemented yet")
+	klog.V(4).Infof("NodeExpandVolume called with %+v", *req)
+	volumeID, _, err := getVolumeIDAndZone(req.GetVolumeId())
+	if err != nil {
+		return nil, err
+	}
+
+	volumePath := req.GetVolumePath()
+	if volumePath == "" {
+		return nil, status.Error(codes.InvalidArgument, "volumePath not provided")
+	}
+
+	devicePath, err := d.diskUtils.GetDevicePath(volumeID)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, status.Errorf(codes.NotFound, "volume %s is not mounted on node", volumeID)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get device path for volume %s: %v", volumeID, err)
+	}
+
+	isBlock, err := d.diskUtils.IsBlockDevice(volumePath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error checking stat for %s: %s", devicePath, err.Error())
+	}
+
+	volumeCapability := req.GetVolumeCapability()
+	if volumeCapability != nil {
+		err = validateVolumeCapabilities([]*csi.VolumeCapability{volumeCapability})
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "volumeCapability not supported: %s", err)
+		}
+
+		switch volumeCapability.GetAccessType().(type) {
+		case *csi.VolumeCapability_Block:
+			isBlock = true
+		}
+	}
+
+	// no need to resize if it's in block mode
+	if isBlock {
+		return &csi.NodeExpandVolumeResponse{}, nil
+	}
+
+	err = d.diskUtils.Resize(volumePath, devicePath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to resize volume %s mounted on %s: %v", volumeID, volumePath, err)
+	}
+
+	return &csi.NodeExpandVolumeResponse{}, nil
 }

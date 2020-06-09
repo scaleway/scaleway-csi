@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kubernetes-csi/csi-test/pkg/sanity"
+	"github.com/kubernetes-csi/csi-test/v3/pkg/sanity"
 	"github.com/scaleway/scaleway-csi/scaleway"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
@@ -19,15 +19,25 @@ import (
 	utilsio "k8s.io/utils/io"
 )
 
+type fakeHelper struct {
+	fakeDiskUtils
+	fakeInstanceAPI
+}
+
 func TestSanityCSI(t *testing.T) {
 	endpoint := "/tmp/csi-testing.sock"
 	nodeID := "fb094b6a-a732-4d5f-8283-bd6726ff5938"
 	volumesMap := make(map[string]*instance.Volume)
 	serversMap := map[string]*instance.Server{
 		nodeID: &instance.Server{
-			ID:      nodeID,
-			Volumes: make(map[string]*instance.Volume),
-			Zone:    scw.ZoneFrPar1,
+			ID: nodeID,
+			Volumes: map[string]*instance.Volume{"fb094b6a-b73b-4d5f-8283-bd6726ff5938": {
+				ID:         "fb094b6a-b73b-4d5f-8283-bd6726ff5938",
+				VolumeType: instance.VolumeVolumeTypeLSSD,
+				Zone:       scw.ZoneFrPar1,
+				Name:       "local",
+			}},
+			Zone: scw.ZoneFrPar1,
 		},
 	}
 	snapshotsMap := make(map[string]*instance.Snapshot)
@@ -37,42 +47,46 @@ func TestSanityCSI(t *testing.T) {
 		Endpoint: fmt.Sprintf("unix://%s", endpoint),
 		Mode:     AllMode,
 	}
+	fakeInstance := &fakeInstanceAPI{
+		volumesMap:   volumesMap,
+		serversMap:   serversMap,
+		snapshotsMap: snapshotsMap,
+		defaultZone:  scw.ZoneFrPar1,
+	}
+	fakeDiskUtils := &fakeDiskUtils{
+		devices: diskUtilsDevices,
+	}
+	fakeHelper := &fakeHelper{
+		fakeDiskUtils:   *fakeDiskUtils,
+		fakeInstanceAPI: *fakeInstance,
+	}
 
 	driver := &Driver{
 		config: driverConfig,
 		controllerService: controllerService{
 			scaleway: &scaleway.Scaleway{
-				InstanceAPI: &fakeInstanceAPI{
-					volumesMap:   volumesMap,
-					serversMap:   serversMap,
-					snapshotsMap: snapshotsMap,
-					defaultZone:  scw.ZoneFrPar1,
-				},
+				InstanceAPI: fakeHelper,
 			},
 			config: driverConfig,
 		},
 		nodeService: nodeService{
-			nodeID:   nodeID,
-			nodeZone: scw.ZoneFrPar1,
-			diskUtils: &fakeDiskUtils{
-				devices: diskUtilsDevices,
-			},
+			nodeID:    nodeID,
+			nodeZone:  scw.ZoneFrPar1,
+			diskUtils: fakeHelper,
 		},
 	}
 
 	go driver.Run() // an error here woule fail the test anyway since the grpc server would not be started
 
-	config := &sanity.Config{
-		TargetPath:  os.TempDir() + "/csi-testing-target",
-		StagingPath: os.TempDir() + "/csi-testing-staging",
-		RemoveTargetPath: func(path string) error {
-			return os.RemoveAll(path)
-		},
-		RemoveStagingPath: func(path string) error {
-			return os.RemoveAll(path)
-		},
-		Address: endpoint,
-		IDGen:   sanity.DefaultIDGenerator{},
+	config := sanity.NewTestConfig()
+	config.Address = endpoint
+	config.TestNodeVolumeAttachLimit = true
+	config.TestVolumeExpandSize = config.TestVolumeSize * 2
+	config.RemoveTargetPath = func(path string) error {
+		return os.RemoveAll(path)
+	}
+	config.RemoveStagingPath = func(path string) error {
+		return os.RemoveAll(path)
 	}
 	sanity.Test(t, config)
 	driver.srv.GracefulStop()
@@ -86,7 +100,20 @@ type fakeInstanceAPI struct {
 	defaultZone  scw.Zone
 }
 
-func (s *fakeInstanceAPI) ListVolumes(req *instance.ListVolumesRequest, opts ...scw.RequestOption) (*instance.ListVolumesResponse, error) {
+func (s *fakeHelper) ListVolumesTypes(req *instance.ListVolumesTypesRequest, opts ...scw.RequestOption) (*instance.ListVolumesTypesResponse, error) {
+	return &instance.ListVolumesTypesResponse{
+		Volumes: map[string]*instance.VolumeType{
+			instance.VolumeVolumeTypeBSSD.String(): {
+				Constraints: &instance.VolumeTypeConstraints{
+					Max: 10 * 1000 * 1000 * 1000 * 1000,
+					Min: 1 * 1000 * 1000 * 1000,
+				},
+			},
+		},
+	}, nil
+}
+
+func (s *fakeHelper) ListVolumes(req *instance.ListVolumesRequest, opts ...scw.RequestOption) (*instance.ListVolumesResponse, error) {
 	volumes := make([]*instance.Volume, 0)
 	for _, v := range s.volumesMap {
 		if req.Name == nil || strings.Contains(v.Name, *req.Name) {
@@ -96,7 +123,7 @@ func (s *fakeInstanceAPI) ListVolumes(req *instance.ListVolumesRequest, opts ...
 	return &instance.ListVolumesResponse{Volumes: volumes, TotalCount: uint32(len(volumes))}, nil
 }
 
-func (s *fakeInstanceAPI) CreateVolume(req *instance.CreateVolumeRequest, opts ...scw.RequestOption) (*instance.CreateVolumeResponse, error) {
+func (s *fakeHelper) CreateVolume(req *instance.CreateVolumeRequest, opts ...scw.RequestOption) (*instance.CreateVolumeResponse, error) {
 	if req.Zone == "" {
 		req.Zone = s.defaultZone
 	}
@@ -109,13 +136,13 @@ func (s *fakeInstanceAPI) CreateVolume(req *instance.CreateVolumeRequest, opts .
 	} else if req.BaseVolume != nil {
 		baseVol, ok := s.volumesMap[*req.BaseVolume]
 		if !ok {
-			return nil, &scw.ResponseError{StatusCode: 404}
+			return nil, &scw.ResourceNotFoundError{}
 		}
 		volume.Size = baseVol.Size
 	} else if req.BaseSnapshot != nil {
 		baseSnap, ok := s.snapshotsMap[*req.BaseSnapshot]
 		if !ok {
-			return nil, &scw.ResponseError{StatusCode: 404}
+			return nil, &scw.ResourceNotFoundError{}
 		}
 		volume.Size = baseSnap.Size
 	} else {
@@ -128,63 +155,106 @@ func (s *fakeInstanceAPI) CreateVolume(req *instance.CreateVolumeRequest, opts .
 	return &instance.CreateVolumeResponse{Volume: volume}, nil
 }
 
-func (s *fakeInstanceAPI) GetVolume(req *instance.GetVolumeRequest, opts ...scw.RequestOption) (*instance.GetVolumeResponse, error) {
+func (s *fakeHelper) GetVolume(req *instance.GetVolumeRequest, opts ...scw.RequestOption) (*instance.GetVolumeResponse, error) {
 	if vol, ok := s.volumesMap[req.VolumeID]; ok {
 		return &instance.GetVolumeResponse{Volume: vol}, nil
 	}
-	return nil, &scw.ResponseError{StatusCode: 404}
+	return nil, &scw.ResourceNotFoundError{}
 }
 
-func (s *fakeInstanceAPI) DeleteVolume(req *instance.DeleteVolumeRequest, opts ...scw.RequestOption) error {
+func (s *fakeHelper) UpdateVolume(req *instance.UpdateVolumeRequest, opts ...scw.RequestOption) (*instance.UpdateVolumeResponse, error) {
+	vol, ok := s.volumesMap[req.VolumeID]
+	if !ok {
+		return nil, &scw.ResourceNotFoundError{}
+	}
+
+	if req.Name != nil {
+		vol.Name = *req.Name
+	}
+	// TODO add size
+	return &instance.UpdateVolumeResponse{
+		Volume: vol,
+	}, nil
+}
+
+func (s *fakeHelper) DeleteVolume(req *instance.DeleteVolumeRequest, opts ...scw.RequestOption) error {
 	if _, ok := s.volumesMap[req.VolumeID]; ok {
 		delete(s.volumesMap, req.VolumeID)
 		return nil
 	}
-	return &scw.ResponseError{StatusCode: 404}
+	return &scw.ResourceNotFoundError{}
 }
 
-func (s *fakeInstanceAPI) GetServer(req *instance.GetServerRequest, opts ...scw.RequestOption) (*instance.GetServerResponse, error) {
+func (s *fakeHelper) GetServer(req *instance.GetServerRequest, opts ...scw.RequestOption) (*instance.GetServerResponse, error) {
 	if srv, ok := s.serversMap[req.ServerID]; ok {
 		return &instance.GetServerResponse{Server: srv}, nil
 	}
-	return nil, &scw.ResponseError{StatusCode: 404}
+	return nil, &scw.ResourceNotFoundError{}
 }
 
-func (s *fakeInstanceAPI) AttachVolume(req *instance.AttachVolumeRequest, opts ...scw.RequestOption) (*instance.AttachVolumeResponse, error) {
+func (s *fakeHelper) AttachVolume(req *instance.AttachVolumeRequest, opts ...scw.RequestOption) (*instance.AttachVolumeResponse, error) {
 	if vol, ok := s.volumesMap[req.VolumeID]; ok {
 		if srv, ok := s.serversMap[req.ServerID]; ok {
 			for i := 0; i <= len(srv.Volumes); i++ {
 				key := fmt.Sprintf("%d", i)
+				if existingVol, ok := srv.Volumes[key]; ok && existingVol.ID == vol.ID {
+					break
+				}
 				if _, ok := srv.Volumes[key]; !ok {
+					vol.Server = &instance.ServerSummary{
+						ID: req.ServerID,
+					}
 					srv.Volumes[key] = vol
 					break
 				}
 			} // an empty slot will always be found
+			s.devices[path.Join(diskByIDPath, diskSCWPrefix+req.VolumeID)] = &mountpoint{
+				block: true,
+			}
 			return &instance.AttachVolumeResponse{Server: srv}, nil
 		}
 	}
-	return nil, &scw.ResponseError{StatusCode: 404}
+	return nil, &scw.ResourceNotFoundError{}
 }
 
-func (s *fakeInstanceAPI) DetachVolume(req *instance.DetachVolumeRequest, opts ...scw.RequestOption) (*instance.DetachVolumeResponse, error) {
-	if _, ok := s.volumesMap[req.VolumeID]; ok {
+func (s *fakeHelper) DetachVolume(req *instance.DetachVolumeRequest, opts ...scw.RequestOption) (*instance.DetachVolumeResponse, error) {
+	if vol, ok := s.volumesMap[req.VolumeID]; ok {
 		delete(s.volumesMap, req.VolumeID)
+		delete(s.devices, path.Join(diskByIDPath, diskSCWPrefix+req.VolumeID))
+
+		if srv, ok := s.serversMap[vol.Server.ID]; ok {
+			for i := 0; i <= len(srv.Volumes); i++ {
+				key := fmt.Sprintf("%d", i)
+				if v, ok := srv.Volumes[key]; ok && v.ID == req.VolumeID {
+					delete(srv.Volumes, key)
+					break
+				}
+			} // an empty slot will always be found
+		}
+
 		return &instance.DetachVolumeResponse{}, nil
 	}
-	return nil, &scw.ResponseError{StatusCode: 404}
+	return nil, &scw.ResourceNotFoundError{}
 }
 
-func (s *fakeInstanceAPI) GetSnapshot(req *instance.GetSnapshotRequest, opts ...scw.RequestOption) (*instance.GetSnapshotResponse, error) {
+func (s *fakeHelper) WaitForVolume(req *instance.WaitForVolumeRequest) (*instance.Volume, error) {
+	if vol, ok := s.volumesMap[req.VolumeID]; ok {
+		return vol, nil
+	}
+	return nil, &scw.ResourceNotFoundError{}
+}
+
+func (s *fakeHelper) GetSnapshot(req *instance.GetSnapshotRequest, opts ...scw.RequestOption) (*instance.GetSnapshotResponse, error) {
 	snapshot, ok := s.snapshotsMap[req.SnapshotID]
 	if !ok {
-		return nil, &scw.ResponseError{StatusCode: 404}
+		return nil, &scw.ResourceNotFoundError{}
 	}
 	return &instance.GetSnapshotResponse{
 		Snapshot: snapshot,
 	}, nil
 }
 
-func (s *fakeInstanceAPI) ListSnapshots(req *instance.ListSnapshotsRequest, opts ...scw.RequestOption) (*instance.ListSnapshotsResponse, error) {
+func (s *fakeHelper) ListSnapshots(req *instance.ListSnapshotsRequest, opts ...scw.RequestOption) (*instance.ListSnapshotsResponse, error) {
 	snapshots := make([]*instance.Snapshot, 0)
 	for _, snap := range s.snapshotsMap {
 		if req.Name == nil || strings.Contains(snap.Name, *req.Name) {
@@ -197,14 +267,14 @@ func (s *fakeInstanceAPI) ListSnapshots(req *instance.ListSnapshotsRequest, opts
 	return &instance.ListSnapshotsResponse{Snapshots: snapshots, TotalCount: uint32(len(snapshots))}, nil
 }
 
-func (s *fakeInstanceAPI) CreateSnapshot(req *instance.CreateSnapshotRequest, opts ...scw.RequestOption) (*instance.CreateSnapshotResponse, error) {
+func (s *fakeHelper) CreateSnapshot(req *instance.CreateSnapshotRequest, opts ...scw.RequestOption) (*instance.CreateSnapshotResponse, error) {
 	if req.Zone == "" {
 		req.Zone = s.defaultZone
 	}
 
 	volume, ok := s.volumesMap[req.VolumeID]
 	if !ok {
-		return nil, &scw.ResponseError{StatusCode: 404}
+		return nil, &scw.ResourceNotFoundError{}
 	}
 	snapshot := &instance.Snapshot{}
 	snapshot.ID = uuid.New().String()
@@ -225,16 +295,16 @@ func (s *fakeInstanceAPI) CreateSnapshot(req *instance.CreateSnapshotRequest, op
 	}, nil
 }
 
-func (s *fakeInstanceAPI) DeleteSnapshot(req *instance.DeleteSnapshotRequest, opts ...scw.RequestOption) error {
+func (s *fakeHelper) DeleteSnapshot(req *instance.DeleteSnapshotRequest, opts ...scw.RequestOption) error {
 	if _, ok := s.snapshotsMap[req.SnapshotID]; ok {
 		delete(s.snapshotsMap, req.SnapshotID)
 		return nil
 	}
-	return &scw.ResponseError{StatusCode: 404}
+	return &scw.ResourceNotFoundError{}
 }
 
 type mountpoint struct {
-	path         string
+	targetPath   string
 	fsType       string
 	mountOptions []string
 	block        bool
@@ -244,17 +314,28 @@ type fakeDiskUtils struct {
 	devices map[string]*mountpoint
 }
 
-func (d *fakeDiskUtils) FormatAndMount(targetPath string, devicePath string, fsType string, mountOptions []string) error {
-	return d.MountToTarget(devicePath, targetPath, fsType, mountOptions)
-}
-
-func (d *fakeDiskUtils) MountToTarget(sourcePath, targetPath, fsType string, mountOptions []string) error {
+// FormatAndMount is only used for non block devices
+func (s *fakeHelper) FormatAndMount(targetPath string, devicePath string, fsType string, mountOptions []string) error {
 	if fsType == "" {
 		fsType = defaultFSType
 	}
 
-	d.devices[targetPath] = &mountpoint{
-		path:         sourcePath,
+	s.devices[devicePath] = &mountpoint{
+		targetPath:   targetPath,
+		fsType:       fsType,
+		mountOptions: mountOptions,
+		block:        false,
+	}
+	return nil
+}
+
+func (s *fakeHelper) MountToTarget(sourcePath, targetPath, fsType string, mountOptions []string) error {
+	if fsType == "" {
+		fsType = defaultFSType
+	}
+
+	s.devices[sourcePath] = &mountpoint{
+		targetPath:   targetPath,
 		fsType:       fsType,
 		mountOptions: mountOptions,
 		block:        strings.HasPrefix(sourcePath, diskByIDPath),
@@ -262,7 +343,7 @@ func (d *fakeDiskUtils) MountToTarget(sourcePath, targetPath, fsType string, mou
 	return nil
 }
 
-func (d *fakeDiskUtils) getDeviceType(devicePath string) (string, error) {
+func (s *fakeHelper) getDeviceType(devicePath string) (string, error) {
 	blkidPath, err := exec.LookPath("blkid")
 	if err != nil {
 		return "", err
@@ -300,23 +381,33 @@ func (d *fakeDiskUtils) getDeviceType(devicePath string) (string, error) {
 	return "", nil
 }
 
-func (d *fakeDiskUtils) GetDevicePath(volumeID string) (string, error) {
-	return path.Join(diskByIDPath, diskSCWPrefix+volumeID), nil
+func (s *fakeHelper) GetDevicePath(volumeID string) (string, error) {
+	if _, ok := s.devices[path.Join(diskByIDPath, diskSCWPrefix+volumeID)]; ok {
+		return path.Join(diskByIDPath, diskSCWPrefix+volumeID), nil
+	}
+
+	return "", os.ErrNotExist
 }
 
-func (d *fakeDiskUtils) IsSharedMounted(targetPath string, devicePath string) (bool, error) {
+func (s *fakeHelper) IsSharedMounted(targetPath string, devicePath string) (bool, error) {
 	if targetPath == "" {
 		return false, errTargetPathEmpty
 	}
-	if _, ok := d.devices[targetPath]; ok {
-		return true, nil
+	if d, ok := s.devices[devicePath]; ok {
+		return d.targetPath == targetPath, nil
+	}
+
+	for _, tp := range s.devices {
+		if tp.targetPath == targetPath {
+			return true, nil
+		}
 	}
 
 	return false, nil
 }
 
 // taken from https://github.com/kubernetes/kubernetes/blob/master/pkg/util/mount/mount_linux.go
-func (d *fakeDiskUtils) GetMountInfo(targetPath string) (*mountInfo, error) {
+func (s *fakeHelper) GetMountInfo(targetPath string) (*mountInfo, error) {
 	content, err := utilsio.ConsistentRead(procMountInfoPath, procMountInfoMaxListTries)
 	if err != nil {
 		return &mountInfo{}, err
@@ -370,16 +461,16 @@ func (d *fakeDiskUtils) GetMountInfo(targetPath string) (*mountInfo, error) {
 	return &mountInfo{}, nil
 }
 
-func (d *fakeDiskUtils) IsBlockDevice(path string) (bool, error) {
-	for _, mp := range d.devices {
-		if mp.path == path {
+func (s *fakeHelper) IsBlockDevice(path string) (bool, error) {
+	for _, mp := range s.devices {
+		if mp.targetPath == path {
 			return mp.block, nil
 		}
 	}
 	return false, fmt.Errorf("not found") // enough for csi sanity?
 }
 
-func (d *fakeDiskUtils) GetStatfs(path string) (*unix.Statfs_t, error) {
+func (s *fakeHelper) GetStatfs(path string) (*unix.Statfs_t, error) {
 	return &unix.Statfs_t{
 		Blocks: 1000,
 		Bsize:  4,
@@ -387,4 +478,20 @@ func (d *fakeDiskUtils) GetStatfs(path string) (*unix.Statfs_t, error) {
 		Files:  1000,
 		Ffree:  500,
 	}, nil
+}
+
+func (s *fakeHelper) Resize(targetPath string, devicePath string) error {
+	mountInfo, err := s.GetMountInfo(targetPath)
+	if err != nil {
+		return err
+	}
+
+	switch mountInfo.fsType {
+	case "ext3", "ext4":
+		return nil
+	case "xfs":
+		return nil
+	}
+
+	return fmt.Errorf("filesystem %s does not support resizing", mountInfo.fsType)
 }
