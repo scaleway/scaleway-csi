@@ -16,7 +16,8 @@ reclaimPolicy: Delete
 allowVolumeExpansion: true
 ---
 kind: DaemonSet
-apiVersion: apps/v1 metadata:
+apiVersion: apps/v1
+metadata:
   name: scaleway-csi-node
   namespace: kube-system
   labels:
