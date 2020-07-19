@@ -10,6 +10,9 @@ The [Scaleway Block Volume](https://www.scaleway.com/en/block-storage/) Containe
 |----------------------------------------|--------|
 | master branch                          | yes    |
 | v0.1.0                                 | yes    |
+| v0.1.1                                 | yes    |
+| v0.1.2                                 | yes    |
+| v0.1.3                                 | yes    |
 
 ### Features
 
@@ -77,9 +80,9 @@ $ kubectl apply -f ./deploy/kubernetes/scaleway-secret.yaml
 
 2. Deploy the Scaleway CSI driver and the needed sidecars.
 
-It's recommended to deploy the latest tagged version, but you can also deploy the master version. Here we will deploy the latest version `0.1.0`.
+It's recommended to deploy the latest tagged version, but you can also deploy the master version. Here we will deploy the latest version `0.1.3`.
 ```bash
-$ kubectl create -f ./deploy/kubernetes/scaleway-csi-v0.1.0.yaml
+$ kubectl create -f ./deploy/kubernetes/scaleway-csi-v0.1.3.yaml
 ```
 
 You can now verify that the driver is running:
