@@ -8,7 +8,7 @@ require (
 	github.com/golang/protobuf v1.3.2
 	github.com/google/uuid v1.1.1
 	github.com/kubernetes-csi/csi-test/v3 v3.1.0
-	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.6.0.20200608175253-d0adc17352c5
+	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.6.0.20200814130755-648e470a1d42
 	golang.org/x/sys v0.0.0-20191113165036-4c7a9d0fe056
 	google.golang.org/grpc v1.25.1
 	k8s.io/klog v1.0.0
