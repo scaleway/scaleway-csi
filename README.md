@@ -66,7 +66,7 @@ These steps will cover how to install the Scaleway CSI driver in your Kubernetes
 #### Requirements
 
 * A Kubernetes cluster running on Scaleway instances (v1.17+)
-* Scaleway Organizaton ID, Access and Secret key
+* Scaleway Project or Organization ID, Access and Secret key
 
 #### Deployment
 
