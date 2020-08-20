@@ -40,6 +40,7 @@ var (
 	scwVolumeZone = DriverName + "/volume-zone"
 
 	volumeTypeKey = "type"
+	encryptedKey  = "encrypted"
 )
 
 type controllerService struct {
@@ -58,7 +59,7 @@ func newControllerService(config *DriverConfig) controllerService {
 // CreateVolume creates a new volume with the given CreateVolumeRequest.
 // This function is idempotent
 func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	klog.V(4).Infof("CreateVolume: called with %+v", *req)
+	klog.V(4).Infof("CreateVolume: called with %s", stripSecretFromReq(*req))
 
 	volumeName := req.GetName()
 	if volumeName == "" {
@@ -75,11 +76,20 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.InvalidArgument, "volumeCapabilities not supported: %s", err)
 	}
 
+	encrypted := false
+
 	volumeType := scaleway.DefaultVolumeType
 	for key, value := range req.GetParameters() {
 		switch strings.ToLower(key) {
 		case volumeTypeKey:
 			volumeType = instance.VolumeVolumeType(value)
+		case encryptedKey:
+			encryptedValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid bool value (%s) for parameter %s: %v", value, key, err)
+			}
+			// TODO check if this value has changed?
+			encrypted = encryptedValue
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter key %s", key)
 		}
@@ -114,6 +124,9 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 				VolumeId:           volume.Zone.String() + "/" + volume.ID,
 				CapacityBytes:      int64(volume.Size),
 				AccessibleTopology: newAccessibleTopology(volume.Zone),
+				VolumeContext: map[string]string{
+					encryptedKey: strconv.FormatBool(encrypted),
+				},
 			},
 		}, nil
 	}
@@ -201,6 +214,9 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 						Segments: segments,
 					},
 				},
+				VolumeContext: map[string]string{
+					encryptedKey: strconv.FormatBool(encrypted),
+				},
 			},
 		}, nil
 	}
@@ -228,6 +244,9 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 						Segments: segments,
 					},
 				},
+				VolumeContext: map[string]string{
+					encryptedKey: strconv.FormatBool(encrypted),
+				},
 			},
 		}, nil
 	}
@@ -239,7 +258,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 // DeleteVolume deprovision a volume.
 // This operation MUST be idempotent.
 func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	klog.V(4).Infof("DeleteVolume called with %+v", *req)
+	klog.V(4).Infof("DeleteVolume called with %s", stripSecretFromReq(*req))
 	volumeID, volumeZone, err := getVolumeIDAndZone(req.GetVolumeId())
 	if err != nil {
 		return nil, err
@@ -281,7 +300,7 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 // ControllerPublishVolume perform the work that is necessary for making the volume available on the given node.
 // This operation MUST be idempotent.
 func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	klog.V(4).Infof("ControllerPublishVolume called with %+v", *req)
+	klog.V(4).Infof("ControllerPublishVolume called with %s", stripSecretFromReq(*req))
 
 	volumeID, volumeZone, err := getVolumeIDAndZone(req.GetVolumeId())
 	if err != nil {
@@ -370,7 +389,7 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 // ControllerUnpublishVolume is the reverse operation of ControllerPublishVolume
 // This operation MUST be idempotent.
 func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	klog.V(4).Infof("ControllerUnpublishVolume called with %+v", *req)
+	klog.V(4).Infof("ControllerUnpublishVolume called with %s", stripSecretFromReq(*req))
 
 	volumeID, volumeZone, err := getVolumeIDAndZone(req.GetVolumeId())
 	if err != nil {
@@ -426,7 +445,7 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 // volume capabilities specified in the request are supported.
 //This operation MUST be idempotent.
 func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	klog.V(4).Infof("ValidateVolumeCapabilities called with %+v", *req)
+	klog.V(4).Infof("ValidateVolumeCapabilities called with %s", stripSecretFromReq(*req))
 	volumeID, volumeZone, err := getVolumeIDAndZone(req.GetVolumeId())
 	if err != nil {
 		return nil, err
@@ -462,7 +481,7 @@ func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req 
 
 // ListVolumes returns the list of the requested volumes
 func (d *controllerService) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-	klog.V(4).Infof("ListVolumes called with %+v", *req)
+	klog.V(4).Infof("ListVolumes called with %s", stripSecretFromReq(*req))
 	var numberResults int
 	var err error
 
@@ -526,7 +545,7 @@ func (d *controllerService) GetCapacity(ctx context.Context, req *csi.GetCapacit
 
 // ControllerGetCapabilities returns  the supported capabilities of controller service provided by the Plugin.
 func (d *controllerService) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
-	klog.V(4).Infof("ControllerGetCapabilities called with %v", *req)
+	klog.V(4).Infof("ControllerGetCapabilities called with %v", stripSecretFromReq(*req))
 	var capabilities []*csi.ControllerServiceCapability
 	for _, capability := range controllerCapabilities {
 		capabilities = append(capabilities, &csi.ControllerServiceCapability{
@@ -542,7 +561,7 @@ func (d *controllerService) ControllerGetCapabilities(ctx context.Context, req *
 
 // CreateSnapshot creates a snapshot of the given volume
 func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	klog.V(4).Infof("CreateSnapshot called with %v", *req)
+	klog.V(4).Infof("CreateSnapshot called with %v", stripSecretFromReq(*req))
 	sourceVolumeID, sourceVolumeZone, err := getSourceVolumeIDAndZone(req.GetSourceVolumeId())
 	if err != nil {
 		return nil, err
@@ -620,7 +639,7 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 // DeleteSnapshot deletes the given snapshot
 func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	klog.V(4).Infof("DeleteSnapshot called with %+v", *req)
+	klog.V(4).Infof("DeleteSnapshot called with %s", stripSecretFromReq(*req))
 	snapshotID, snapshotZone, err := getSnapshotIDAndZone(req.GetSnapshotId())
 	if err != nil {
 		return nil, err
@@ -646,7 +665,7 @@ func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 // they were created. ListSnapshots SHALL NOT list a snapshot that
 // is being created but has not been cut successfully yet.
 func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	klog.V(4).Infof("ListSnapshots called with %+v", *req)
+	klog.V(4).Infof("ListSnapshots called with %s", stripSecretFromReq(*req))
 	var numberResults int
 	var err error
 
@@ -728,7 +747,7 @@ func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 // ControllerExpandVolume expands the given volume
 func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	klog.V(4).Infof("ControllerExpandVolume called with %+v", *req)
+	klog.V(4).Infof("ControllerExpandVolume called with %s", stripSecretFromReq(*req))
 	volumeID, volumeZone, err := getVolumeIDAndZone(req.GetVolumeId())
 	if err != nil {
 		return nil, err

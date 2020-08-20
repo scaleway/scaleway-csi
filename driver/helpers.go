@@ -1,8 +1,10 @@
 package driver
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -242,4 +244,41 @@ func createMountPoint(path string, file bool) error {
 		}
 	}
 	return nil
+}
+
+var secretsField = "Secrets"
+
+func stripSecretFromReq(req interface{}) string {
+	ret := "{"
+
+	reqValue := reflect.ValueOf(req)
+	reqType := reqValue.Type()
+	if reqType.Kind() == reflect.Struct {
+		for i := 0; i < reqValue.NumField(); i++ {
+			field := reqType.Field(i)
+			value := reqValue.Field(i)
+
+			valueToPrint := fmt.Sprintf("%+v", value.Interface())
+
+			if field.Name == secretsField && value.Kind() == reflect.Map {
+				valueToPrint = "["
+				for j := 0; j < len(value.MapKeys()); j++ {
+					valueToPrint += fmt.Sprintf("%s:<redacted>", value.MapKeys()[j].String())
+					if j != len(value.MapKeys())-1 {
+						valueToPrint += " "
+					}
+				}
+				valueToPrint += "]"
+			}
+
+			ret += fmt.Sprintf("%s:%s", field.Name, valueToPrint)
+			if i != reqValue.NumField()-1 {
+				ret += " "
+			}
+		}
+	}
+
+	ret += "}"
+
+	return ret
 }

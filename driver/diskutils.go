@@ -16,8 +16,10 @@ import (
 )
 
 const (
-	diskByIDPath  = "/dev/disk/by-id"
-	diskSCWPrefix = "scsi-0SCW_b_ssd_volume-"
+	diskByIDPath         = "/dev/disk/by-id"
+	diskSCWPrefix        = "scsi-0SCW_b_ssd_volume-"
+	diskLuksMapperPrefix = "scw-luks-"
+	diskLuksMapperPath   = "/dev/mapper/"
 
 	defaultFSType = "ext4"
 
@@ -55,12 +57,107 @@ type DiskUtils interface {
 
 	// Resize resizes the given volumes
 	Resize(targetPath string, devicePath string) error
+
+	// EncryptAndOpenDevice encrypts the volume with the given ID with the given passphrase and open it
+	// If the device is already encrypted (LUKS header present), it will only open the device
+	EncryptAndOpenDevice(volumeID string, passphrase string) (string, error)
+
+	// CloseDevice closes the encrypted device with the given ID
+	CloseDevice(volumeID string) error
+
+	// GetMappedDevicePath returns the path on where the encrypted device with the given ID is mapped
+	GetMappedDevicePath(volumeID string) (string, error)
 }
 
 type diskUtils struct{}
 
 func newDiskUtils() *diskUtils {
 	return &diskUtils{}
+}
+
+func (d *diskUtils) EncryptAndOpenDevice(volumeID string, passphrase string) (string, error) {
+	encryptedDevicePath, err := d.GetMappedDevicePath(volumeID)
+	if err != nil {
+		return "", err
+	}
+
+	if encryptedDevicePath != "" {
+		// device is already encrypted and open
+		return encryptedDevicePath, nil
+	}
+
+	// let's check if the device is aready a luks device
+	devicePath, err := d.GetDevicePath(volumeID)
+	if err != nil {
+		return "", fmt.Errorf("error getting device path for volume %s: %w", volumeID, err)
+	}
+	isLuks, err := luksIsLuks(devicePath)
+	if err != nil {
+		return "", fmt.Errorf("error checking if device %s is a luks device: %w", devicePath, err)
+	}
+
+	if !isLuks {
+		// need to format the device
+		err = luksFormat(devicePath, passphrase)
+		if err != nil {
+			return "", fmt.Errorf("error formating device %s: %w", devicePath, err)
+		}
+	}
+
+	err = luksOpen(devicePath, diskLuksMapperPrefix+volumeID, passphrase)
+	if err != nil {
+		return "", fmt.Errorf("error luks opening device %s: %w", devicePath, err)
+	}
+	return diskLuksMapperPath + diskLuksMapperPrefix + volumeID, nil
+}
+
+func (d *diskUtils) CloseDevice(volumeID string) error {
+	encryptedDevicePath, err := d.GetMappedDevicePath(volumeID)
+	if err != nil {
+		return err
+	}
+
+	if encryptedDevicePath != "" {
+		err = luksClose(diskLuksMapperPrefix + volumeID)
+		if err != nil {
+			return fmt.Errorf("error luks closing %s: %w", encryptedDevicePath, err)
+		}
+	}
+
+	return nil
+}
+
+func (d *diskUtils) GetMappedDevicePath(volumeID string) (string, error) {
+	mappedPath := diskLuksMapperPath + diskLuksMapperPrefix + volumeID
+	_, err := os.Stat(mappedPath)
+	if err != nil {
+		// if the mapped device does not exists on disk, it's not open
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("error checking stat on %s: %w", mappedPath, err)
+	}
+
+	statusStdout, err := luksStatus(diskLuksMapperPrefix + volumeID)
+	if err != nil {
+		return "", fmt.Errorf("error checking luks status on %s: %w", diskLuksMapperPrefix+volumeID, err)
+	}
+
+	statusLines := strings.Split(string(statusStdout), "\n")
+
+	if len(statusLines) == 0 {
+		return "", fmt.Errorf("luksStatus stdout have 0 lines")
+	}
+
+	// first line should look like
+	// /dev/mapper/<name> is active.
+	if !strings.HasSuffix(statusLines[0], "is active.") {
+		// when a device is not active, an error exit code is thrown
+		// something went wrong if we reach here
+		return "", fmt.Errorf("luksStatus returned ok, but device %s is not active", diskLuksMapperPrefix+volumeID)
+	}
+
+	return mappedPath, nil
 }
 
 func (d *diskUtils) FormatAndMount(targetPath string, devicePath string, fsType string, mountOptions []string) error {
