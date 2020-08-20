@@ -58,7 +58,7 @@ func newNodeService() nodeService {
 // for the first time or for the first time since a NodeUnstageVolume call
 // for the specified volume was called and returned success on that node.
 func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.V(4).Infof("NodeStageVolume called with %+v", *req)
+	klog.V(4).Infof("NodeStageVolume called with %s", stripSecretFromReq(*req))
 
 	// check arguments
 	volumeID, _, err := getVolumeIDAndZone(req.GetVolumeId())
@@ -170,7 +170,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 // NodeUnstageVolume is a reverse operation of NodeStageVolume.
 // It must undo the work by the corresponding NodeStageVolume.
 func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	klog.V(4).Infof("NodeUnstageVolume called with %+v", *req)
+	klog.V(4).Infof("NodeUnstageVolume called with %s", stripSecretFromReq(*req))
 
 	// check arguments
 	volumeID, _, err := getVolumeIDAndZone(req.GetVolumeId())
@@ -221,7 +221,7 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 // on a node. The Plugin SHALL assume that this RPC will be executed
 // on the node where the volume will be used.
 func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	klog.V(4).Infof("NodePublishVolume called with %+v", *req)
+	klog.V(4).Infof("NodePublishVolume called with %s", stripSecretFromReq(*req))
 
 	// check arguments
 	volumeID, _, err := getVolumeIDAndZone(req.GetVolumeId())
@@ -364,7 +364,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			if encrypted {
 				sourcePath, err = d.diskUtils.GetMappedDevicePath(scwVolumeID)
 				if err != nil {
-					return nil, status.Errorf(codes.Internal, "error getting mapped device for encrypted device with ID: %s", scwVolumeID, err.Error())
+					return nil, status.Errorf(codes.Internal, "error getting mapped device for encrypted device with ID %s: %s", scwVolumeID, err.Error())
 				}
 			}
 		}
@@ -395,7 +395,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 // NodeUnpublishVolume is a reverse operation of NodePublishVolume.
 // This RPC MUST undo the work by the corresponding NodePublishVolume.
 func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	klog.V(4).Infof("NodeUnpublishVolume called with %+v", *req)
+	klog.V(4).Infof("NodeUnpublishVolume called with %s", stripSecretFromReq(*req))
 
 	// check arguments
 	volumeID, _, err := getVolumeIDAndZone(req.GetVolumeId())
@@ -433,7 +433,7 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 // NodeGetVolumeStats returns the volume capacity statistics available for the volume
 func (d *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	klog.V(4).Infof("NodeGetVolumeStats called with %+v", *req)
+	klog.V(4).Infof("NodeGetVolumeStats called with %s", stripSecretFromReq(*req))
 
 	volumeID, _, err := getVolumeIDAndZone(req.GetVolumeId())
 	if err != nil {
@@ -546,7 +546,7 @@ func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 // NodeExpandVolume expands the given volume
 func (d *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	klog.V(4).Infof("NodeExpandVolume called with %+v", *req)
+	klog.V(4).Infof("NodeExpandVolume called with %s", stripSecretFromReq(*req))
 	volumeID, _, err := getVolumeIDAndZone(req.GetVolumeId())
 	if err != nil {
 		return nil, err

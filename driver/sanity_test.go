@@ -495,3 +495,15 @@ func (s *fakeHelper) Resize(targetPath string, devicePath string) error {
 
 	return fmt.Errorf("filesystem %s does not support resizing", mountInfo.fsType)
 }
+
+func (s *fakeHelper) EncryptAndOpenDevice(volumeID string, passphrase string) (string, error) {
+	return "", nil
+}
+
+func (s *fakeHelper) CloseDevice(volumeID string) error {
+	return nil
+}
+
+func (s *fakeHelper) GetMappedDevicePath(volumeID string) (string, error) {
+	return "", nil
+}
