@@ -211,3 +211,54 @@ allowedTopologies:
     values:
     - nl-ams-1
 ```
+
+## Encrypting Volumes
+
+This plugin supports at rest encryption of the volumes with Cryptsetup/LUKS.
+
+**Note that resizing an encrypted volume does not work (https://github.com/container-storage-interface/spec/issues/445)**
+
+### Storage Class parameters
+
+In order to have an encrypted volume, `encrypted: true` needs to be added to the StorageClass parameters.
+You will also need an passphrase to encrypt/decrypt the volume, which is take from the secrets passed to the `NodeStageVolume` method.
+
+The [external-provisioner](https://github.com/kubernetes-csi/external-provisioner) can be used to [pass down the wanted secret to the CSI plugin](https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html) (v1.0.1+).
+
+Two additional parameters are needed on the StorageClass:
+- `csi.storage.k8s.io/node-stage-secret-name`: The name of the secret
+- `csi.storage.k8s.io/node-stage-secret-namespace`: The namespace of the secret
+
+The secret needs to have the passphrase in the entry with the key `encryptionPassphrase`.
+
+For instance with the following secret:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: enc-secret
+  namespace: default
+type: Opaque
+data:
+  encryptionPassphrase: bXlhd2Vzb21lcGFzc3BocmFzZQ==
+```
+
+and the following StorageClass:
+```yaml
+allowVolumeExpansion: false # not yet supported
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "scw-bssd-enc"
+provisioner: csi.scaleway.com
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  encrypted: "true"
+  csi.storage.k8s.io/node-stage-secret-name: "enc-secret"
+  csi.storage.k8s.io/node-stage-secret-namespace: "default"
+```
+
+all the PVC created with the StorageClass `scw-bssd-enc` will be encrypted at rest with the passphrase `myawesomepassphrase`.
+
+The [Per Volume Secret](https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html#per-volume-secrets) can also be used to avoid having one passphrase per StorageClass.

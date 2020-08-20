@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -18,6 +19,9 @@ import (
 const (
 	// maximum of volumes per node
 	maxVolumesPerNode = 16
+
+	// name of the secret for the encryption passphrase
+	encryptionPassphraseKey = "encryptionPassphrase"
 )
 
 type nodeService struct {
@@ -62,6 +66,16 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, err
 	}
 
+	encrypted := false
+	if encryptedValueString, ok := req.GetVolumeContext()[encryptedKey]; ok {
+		encryptedValue, err := strconv.ParseBool(encryptedValueString)
+		if err != nil {
+			// should never happen but better safe than sorry, let's panic
+			panic(err)
+		}
+		encrypted = encryptedValue
+	}
+
 	stagingTargetPath := req.GetStagingTargetPath()
 	if stagingTargetPath == "" {
 		return nil, status.Error(codes.InvalidArgument, "stagingTargetPath not provided")
@@ -75,12 +89,6 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	err = validateVolumeCapabilities([]*csi.VolumeCapability{volumeCapability})
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "volumeCapability not supported: %s", err)
-	}
-
-	switch volumeCapability.GetAccessType().(type) {
-	// no need to mount if it's in block mode
-	case *csi.VolumeCapability_Block:
-		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
 	volumeName, ok := req.GetPublishContext()[scwVolumeName]
@@ -101,6 +109,23 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Errorf(codes.Internal, "error getting device path for volume with ID %s: %s", volumeID, err.Error())
 	}
 	klog.V(4).Infof("volume %s with ID %s has device path %s", volumeName, volumeID, devicePath)
+
+	if encrypted {
+		passhrase, ok := req.GetSecrets()[encryptionPassphraseKey]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "missing passphrase secret for key %s", encryptionPassphraseKey)
+		}
+		devicePath, err = d.diskUtils.EncryptAndOpenDevice(scwVolumeID, passhrase)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "error encrypting/opening volume with ID %s: %s", volumeID, err.Error())
+		}
+	}
+
+	switch volumeCapability.GetAccessType().(type) {
+	// no need to mount if it's in block mode
+	case *csi.VolumeCapability_Block:
+		return &csi.NodeStageVolumeResponse{}, nil
+	}
 
 	isMounted, err := d.diskUtils.IsSharedMounted(stagingTargetPath, devicePath)
 	if err != nil {
@@ -179,8 +204,13 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		klog.V(4).Infof("Volume with ID %s is mounted on %s, umounting it", volumeID, stagingTargetPath)
 		err = mount.Unmount(stagingTargetPath)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "NodeUnstageVolume: error unmounting target path: %s", err.Error())
+			return nil, status.Errorf(codes.Internal, "error unmounting target path: %s", err.Error())
 		}
+	}
+
+	err = d.diskUtils.CloseDevice(volumeID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error closing device with ID %s: %s", volumeID, err.Error())
 	}
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
@@ -221,7 +251,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	scwVolumeID, ok := req.GetPublishContext()[scwVolumeID]
 	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "%s not found for volume wit ID %s", scwVolumeID, volumeID)
+		return nil, status.Errorf(codes.InvalidArgument, "%s not found for volume with ID %s", scwVolumeID, volumeID)
 	}
 
 	volumeName, ok := req.GetPublishContext()[scwVolumeName]
@@ -232,6 +262,16 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	devicePath, err := d.diskUtils.GetDevicePath(scwVolumeID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "volume %s not found: %s", volumeID, err.Error())
+	}
+
+	encrypted := false
+	if encryptedValueString, ok := req.GetVolumeContext()[encryptedKey]; ok {
+		encryptedValue, err := strconv.ParseBool(encryptedValueString)
+		if err != nil {
+			// should never happen but better safe than sorry, let's panic
+			panic(err)
+		}
+		encrypted = encryptedValue
 	}
 
 	// TODO check volumeID
@@ -250,6 +290,14 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		}
 
 		if volumeCapability.GetBlock() != nil {
+			// if block device is encrypted, we should use the mapped path as the source path
+			if encrypted {
+				devicePath, err = d.diskUtils.GetMappedDevicePath(scwVolumeID)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "error getting mapped device for encrypted device %s: %s", devicePath, err.Error())
+				}
+			}
+
 			// unix specific, will error if not unix
 			fd, err := unix.Openat(unix.AT_FDCWD, devicePath, unix.O_RDONLY, uint32(0))
 			defer unix.Close(fd)
@@ -311,6 +359,14 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 					return nil, status.Errorf(codes.Internal, "error setting BLKROSET for block device %s: %s", devicePath, err.Error())
 				}
 			}
+
+			// if block device is encrypted, we should use the mapped path as the source path
+			if encrypted {
+				sourcePath, err = d.diskUtils.GetMappedDevicePath(scwVolumeID)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "error getting mapped device for encrypted device with ID: %s", scwVolumeID, err.Error())
+				}
+			}
 		}
 	} else {
 		sourcePath = stagingTargetPath
@@ -337,7 +393,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 }
 
 // NodeUnpublishVolume is a reverse operation of NodePublishVolume.
-//This RPC MUST undo the work by the corresponding NodePublishVolume.
+// This RPC MUST undo the work by the corresponding NodePublishVolume.
 func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	klog.V(4).Infof("NodeUnpublishVolume called with %+v", *req)
 

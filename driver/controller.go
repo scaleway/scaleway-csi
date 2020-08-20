@@ -40,6 +40,7 @@ var (
 	scwVolumeZone = DriverName + "/volume-zone"
 
 	volumeTypeKey = "type"
+	encryptedKey  = "encrypted"
 )
 
 type controllerService struct {
@@ -75,11 +76,20 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.InvalidArgument, "volumeCapabilities not supported: %s", err)
 	}
 
+	encrypted := false
+
 	volumeType := scaleway.DefaultVolumeType
 	for key, value := range req.GetParameters() {
 		switch strings.ToLower(key) {
 		case volumeTypeKey:
 			volumeType = instance.VolumeVolumeType(value)
+		case encryptedKey:
+			encryptedValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid bool value (%s) for parameter %s: %v", value, key, err)
+			}
+			// TODO check if this value has changed?
+			encrypted = encryptedValue
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter key %s", key)
 		}
@@ -114,6 +124,9 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 				VolumeId:           volume.Zone.String() + "/" + volume.ID,
 				CapacityBytes:      int64(volume.Size),
 				AccessibleTopology: newAccessibleTopology(volume.Zone),
+				VolumeContext: map[string]string{
+					encryptedKey: strconv.FormatBool(encrypted),
+				},
 			},
 		}, nil
 	}
@@ -201,6 +214,9 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 						Segments: segments,
 					},
 				},
+				VolumeContext: map[string]string{
+					encryptedKey: strconv.FormatBool(encrypted),
+				},
 			},
 		}, nil
 	}
@@ -227,6 +243,9 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 					{
 						Segments: segments,
 					},
+				},
+				VolumeContext: map[string]string{
+					encryptedKey: strconv.FormatBool(encrypted),
 				},
 			},
 		}, nil
