@@ -567,19 +567,24 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}
 
 	if snapshot != nil {
-		creationTime, err := ptypes.TimestampProto(snapshot.CreationDate)
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
+		snapshotResp := &csi.Snapshot{
+			SizeBytes:      int64(snapshot.Size), // TODO(pcyvoct) ugly cast
+			SnapshotId:     scaleway.ExpandSnapshotID(snapshot),
+			SourceVolumeId: sourceVolumeZone.String() + "/" + sourceVolumeID,
+			ReadyToUse:     snapshot.State == instance.SnapshotStateAvailable,
+		}
+
+		if snapshot.CreationDate != nil {
+			creationTime, err := ptypes.TimestampProto(*snapshot.CreationDate)
+			if err != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			snapshotResp.CreationTime = creationTime
+
 		}
 
 		return &csi.CreateSnapshotResponse{
-			Snapshot: &csi.Snapshot{
-				SizeBytes:      int64(snapshot.Size), // TODO(pcyvoct) ugly cast
-				SnapshotId:     scaleway.ExpandSnapshotID(snapshot),
-				SourceVolumeId: sourceVolumeZone.String() + "/" + sourceVolumeID,
-				CreationTime:   creationTime,
-				ReadyToUse:     snapshot.State == instance.SnapshotStateAvailable,
-			},
+			Snapshot: snapshotResp,
 		}, nil
 
 	}
@@ -593,19 +598,23 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	creationTime, err := ptypes.TimestampProto(snapshotResp.Snapshot.CreationDate)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	snapshotProtoResp := &csi.Snapshot{
+		SizeBytes:      int64(snapshotResp.Snapshot.Size), // TODO(pcyvoct) ugly cast
+		SnapshotId:     scaleway.ExpandSnapshotID(snapshotResp.Snapshot),
+		SourceVolumeId: sourceVolumeZone.String() + "/" + sourceVolumeID,
+		ReadyToUse:     snapshotResp.Snapshot.State == instance.SnapshotStateAvailable,
+	}
+
+	if snapshotResp.Snapshot.CreationDate != nil {
+		creationTime, err := ptypes.TimestampProto(*snapshotResp.Snapshot.CreationDate)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		snapshotProtoResp.CreationTime = creationTime
 	}
 
 	return &csi.CreateSnapshotResponse{
-		Snapshot: &csi.Snapshot{
-			SizeBytes:      int64(snapshotResp.Snapshot.Size), // TODO(pcyvoct) ugly cast
-			SnapshotId:     scaleway.ExpandSnapshotID(snapshotResp.Snapshot),
-			SourceVolumeId: sourceVolumeZone.String() + "/" + sourceVolumeID,
-			CreationTime:   creationTime,
-			ReadyToUse:     snapshotResp.Snapshot.State == instance.SnapshotStateAvailable,
-		},
+		Snapshot: snapshotProtoResp,
 	}, nil
 }
 
@@ -691,18 +700,23 @@ func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnap
 			sourceID = snap.Zone.String() + "/" + snap.BaseVolume.ID
 		}
 
-		creationTime, err := ptypes.TimestampProto(snap.CreationDate)
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
+		snapshotProtoResp := &csi.Snapshot{
+			SizeBytes:      int64(snap.Size), // TODO(pcyvoct) ugly cast
+			SnapshotId:     scaleway.ExpandSnapshotID(snap),
+			SourceVolumeId: sourceID,
+			ReadyToUse:     snap.State == instance.SnapshotStateAvailable,
 		}
+
+		if snap.CreationDate != nil {
+			creationTime, err := ptypes.TimestampProto(*snap.CreationDate)
+			if err != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			snapshotProtoResp.CreationTime = creationTime
+		}
+
 		snapshotsEntries = append(snapshotsEntries, &csi.ListSnapshotsResponse_Entry{
-			Snapshot: &csi.Snapshot{
-				SizeBytes:      int64(snap.Size), // TODO(pcyvoct) ugly cast
-				SnapshotId:     scaleway.ExpandSnapshotID(snap),
-				SourceVolumeId: sourceID,
-				CreationTime:   creationTime,
-				ReadyToUse:     snap.State == instance.SnapshotStateAvailable,
-			},
+			Snapshot: snapshotProtoResp,
 		})
 	}
 

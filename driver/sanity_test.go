@@ -287,7 +287,7 @@ func (s *fakeHelper) CreateSnapshot(req *instance.CreateSnapshotRequest, opts ..
 		ID:   volume.ID,
 		Name: volume.Name,
 	}
-	snapshot.CreationDate = time.Now()
+	snapshot.CreationDate = scw.TimePtr(time.Now())
 	s.snapshotsMap[snapshot.ID] = snapshot
 
 	return &instance.CreateSnapshotResponse{
