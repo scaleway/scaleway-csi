@@ -20,6 +20,9 @@ const (
 	// DriverName is the official name for the Scaleway CSI plugin
 	DriverName      = "csi.scaleway.com"
 	ZoneTopologyKey = "topology." + DriverName + "/zone"
+
+	// ExtraUserAgentEnv is the environment variable that adds some string at the end of the user agent
+	ExtraUserAgentEnv = "EXTRA_USER_AGENT"
 )
 
 // Mode represents the mode in which the CSI driver started
