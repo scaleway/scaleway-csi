@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,9 +51,14 @@ type controllerService struct {
 }
 
 func newControllerService(config *DriverConfig) controllerService {
+	userAgent := fmt.Sprintf("%s %s (%s)", DriverName, driverVersion, gitCommit)
+	if extraUA := os.Getenv(ExtraUserAgentEnv); extraUA != "" {
+		userAgent = userAgent + " " + extraUA
+	}
+
 	return controllerService{
 		config:   config,
-		scaleway: scaleway.NewScaleway(fmt.Sprintf("%s %s (%s)", DriverName, driverVersion, gitCommit)),
+		scaleway: scaleway.NewScaleway(userAgent),
 	}
 }
 
