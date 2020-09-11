@@ -14,6 +14,7 @@ The [Scaleway Block Volume](https://www.scaleway.com/en/block-storage/) Containe
 | v0.1.2                                 | yes    |
 | v0.1.3                                 | yes    |
 | v0.1.4                                 | yes    |
+| v0.1.5                                 | yes    |
 
 ### Features
 
@@ -55,10 +56,10 @@ The CSI driver allows to use [Persistent Volumes](https://kubernetes.io/docs/con
 
 ### Kubernetes Version Compability Matrix
 
-| Scaleway CSI Driver \ Kubernetes Version | K8S v1.17 | K8S v1.18 |
-|------------------------------------------|-----------|-----------|
-| master branch                            | yes       | yes       |
-| v0.1.x                                   | yes       | yes       |
+| Scaleway CSI Driver \ Kubernetes Version | K8S v1.17 | K8S v1.18 | K8S v1.19 |
+|------------------------------------------|-----------|-----------|-----------|
+| master branch                            | yes       | yes       | yes       |
+| v0.1.x                                   | yes       | yes       | yes       |
 
 ### Examples
 
