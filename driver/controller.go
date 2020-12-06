@@ -42,6 +42,7 @@ var (
 
 	volumeTypeKey = "type"
 	encryptedKey  = "encrypted"
+	fsTypeKey     = "fstype"
 )
 
 type controllerService struct {
@@ -96,6 +97,8 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 			}
 			// TODO check if this value has changed?
 			encrypted = encryptedValue
+		case fsTypeKey:
+			// nop, just allow the parameter to be passed
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter key %s", key)
 		}
