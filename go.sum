@@ -39,8 +39,8 @@ github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7J
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/robertkrimen/otto v0.0.0-20191219234010-c382bd3c16ff/go.mod h1:xvqspoSXJTIpemEonrMDFq6XzwHYYgToXWj5eRX1OtY=
-github.com/scaleway/scaleway-sdk-go v1.0.0-beta.6.0.20200820094136-e5e36003a999 h1:JfTFkJt8n60HtsfHw5e6A1gim8W2kQ57uOXLLQES40w=
-github.com/scaleway/scaleway-sdk-go v1.0.0-beta.6.0.20200820094136-e5e36003a999/go.mod h1:CJJ5VAbozOl0yEw7nHB9+7BXTJbIn6h7W+f6Gau5IP8=
+github.com/scaleway/scaleway-sdk-go v1.0.0-beta.7.0.20201207195254-17763ced6080 h1:XiH2Y4P68/dm16NjXXQf8OzyDv7B6mxAgF4X+vWvYoI=
+github.com/scaleway/scaleway-sdk-go v1.0.0-beta.7.0.20201207195254-17763ced6080/go.mod h1:CJJ5VAbozOl0yEw7nHB9+7BXTJbIn6h7W+f6Gau5IP8=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/spf13/afero v1.2.2/go.mod h1:9ZxEEn6pIJ8Rxe320qSDBk6AsU0r9pR7Q4OcevTdifk=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

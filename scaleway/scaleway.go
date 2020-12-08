@@ -87,7 +87,7 @@ type InstanceAPI interface {
 	DetachVolume(req *instance.DetachVolumeRequest, opts ...scw.RequestOption) (*instance.DetachVolumeResponse, error)
 
 	// WaitForVolume is an interface for the SDK WaitForVolume method
-	WaitForVolume(req *instance.WaitForVolumeRequest) (*instance.Volume, error)
+	WaitForVolume(req *instance.WaitForVolumeRequest, opts ...scw.RequestOption) (*instance.Volume, error)
 
 	// GetSnapshot is an interface for the SDK  GetSnapshot method
 	GetSnapshot(req *instance.GetSnapshotRequest, opts ...scw.RequestOption) (*instance.GetSnapshotResponse, error)
