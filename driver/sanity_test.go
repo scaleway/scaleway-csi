@@ -237,7 +237,7 @@ func (s *fakeHelper) DetachVolume(req *instance.DetachVolumeRequest, opts ...scw
 	return nil, &scw.ResourceNotFoundError{}
 }
 
-func (s *fakeHelper) WaitForVolume(req *instance.WaitForVolumeRequest) (*instance.Volume, error) {
+func (s *fakeHelper) WaitForVolume(req *instance.WaitForVolumeRequest, opts ...scw.RequestOption) (*instance.Volume, error) {
 	if vol, ok := s.volumesMap[req.VolumeID]; ok {
 		return vol, nil
 	}
