@@ -89,7 +89,7 @@ spec:
             - name: registration-dir
               mountPath: /registration/
         - name: liveness-probe
-          image: k8s.gcr.io/sig-storage/livenessprobe:v2.1.0
+          image: k8s.gcr.io/sig-storage/livenessprobe:v2.2.0
           args:
             - "--csi-address=$(CSI_ADDRESS)"
           env:
@@ -755,7 +755,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: liveness-probe
-          image: k8s.gcr.io/sig-storage/livenessprobe:v2.1.0
+          image: k8s.gcr.io/sig-storage/livenessprobe:v2.2.0
           args:
             - "--csi-address=$(CSI_ADDRESS)"
           env:
