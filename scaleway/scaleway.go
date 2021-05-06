@@ -154,9 +154,6 @@ func (s *Scaleway) GetSnapshotByName(name string, sourceVolumeID string, sourceV
 	for _, snapshot := range snapshots.Snapshots {
 		if snapshot.Name == name { // fuzzy search on the API
 			if snapshot.BaseVolume == nil || snapshot.BaseVolume.ID == sourceVolumeID {
-				if snapshot.State == instance.SnapshotStateSnapshotting {
-					return nil, ErrSnapshotStillSnapshotting
-				}
 				return snapshot, nil
 			}
 			return nil, ErrSnapshotSameName
