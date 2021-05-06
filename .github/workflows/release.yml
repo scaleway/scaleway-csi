@@ -28,7 +28,7 @@ jobs:
       - name: Docker login
         run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
       - name: Get tag
-        uses: olegtarasov/get-tag@v1
+        uses: olegtarasov/get-tag@v2.1
         id: tagName
       - name: Make release
         run: make release
