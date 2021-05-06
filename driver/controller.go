@@ -582,8 +582,6 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	if err != nil {
 		switch err {
 		case scaleway.ErrSnapshotNotFound: // all good
-		case scaleway.ErrSnapshotStillSnapshotting:
-			return nil, status.Error(codes.Aborted, "snapshot is still snapshotting")
 		case scaleway.ErrSnapshotSameName:
 			return nil, status.Errorf(codes.AlreadyExists, "a snapshot with the name %s already exists", name)
 		default:
