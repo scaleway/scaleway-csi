@@ -807,6 +807,7 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 
 	vol, err := d.scaleway.WaitForVolume(&instance.WaitForVolumeRequest{
 		VolumeID: volumeID,
+		Zone:     volumeZone,
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
