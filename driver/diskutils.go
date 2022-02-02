@@ -9,9 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/docker/pkg/mount"
 	"golang.org/x/sys/unix"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	kmount "k8s.io/mount-utils"
+	kexec "k8s.io/utils/exec"
 	utilsio "k8s.io/utils/io"
 )
 
@@ -35,6 +36,9 @@ type DiskUtils interface {
 	// FormatAndMount tries to mount `devicePath` on `targetPath` as `fsType` with `mountOptions`
 	// If it fails it will try to format `devicePath` as `fsType` first and retry
 	FormatAndMount(targetPath string, devicePath string, fsType string, mountOptions []string) error
+
+	// Unmount unmounts the given target
+	Unmount(target string) error
 
 	// MountToTarget tries to mount `sourcePath` on `targetPath` as `fsType` with `mountOptions`
 	MountToTarget(sourcePath, targetPath, fsType string, mountOptions []string) error
@@ -69,10 +73,17 @@ type DiskUtils interface {
 	GetMappedDevicePath(volumeID string) (string, error)
 }
 
-type diskUtils struct{}
+type diskUtils struct {
+	kMounter *kmount.SafeFormatAndMount
+}
 
 func newDiskUtils() *diskUtils {
-	return &diskUtils{}
+	return &diskUtils{
+		kMounter: &kmount.SafeFormatAndMount{
+			Interface: kmount.New(""),
+			Exec:      kexec.New(),
+		},
+	}
 }
 
 func (d *diskUtils) EncryptAndOpenDevice(volumeID string, passphrase string) (string, error) {
@@ -131,7 +142,7 @@ func (d *diskUtils) GetMappedDevicePath(volumeID string) (string, error) {
 	mappedPath := diskLuksMapperPath + diskLuksMapperPrefix + volumeID
 	_, err := os.Stat(mappedPath)
 	if err != nil {
-		// if the mapped device does not exists on disk, it's not open
+		// if the mapped device does not exist on disk, it's not open
 		if os.IsNotExist(err) {
 			return "", nil
 		}
@@ -186,12 +197,20 @@ func (d *diskUtils) FormatAndMount(targetPath string, devicePath string, fsType 
 	return nil
 }
 
+func (d *diskUtils) Unmount(target string) error {
+	return kmount.CleanupMountPoint(target, d.kMounter, true)
+}
+
 func (d *diskUtils) MountToTarget(sourcePath, targetPath, fsType string, mountOptions []string) error {
 	if fsType == "" {
 		fsType = defaultFSType
 	}
 
-	return mount.Mount(sourcePath, targetPath, fsType, strings.Join(mountOptions, ","))
+	if err := d.kMounter.Mount(sourcePath, targetPath, fsType, mountOptions); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *diskUtils) formatDevice(devicePath string, fsType string) error {

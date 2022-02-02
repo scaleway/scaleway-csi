@@ -7,13 +7,12 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/docker/docker/pkg/mount"
 	"github.com/scaleway/scaleway-csi/scaleway"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -146,13 +145,13 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
-	mount := volumeCapability.GetMount()
-	if mount == nil {
+	mountCap := volumeCapability.GetMount()
+	if mountCap == nil {
 		return nil, status.Error(codes.InvalidArgument, "mount volume capability is nil")
 	}
 
-	mountOptions := mount.GetMountFlags()
-	fsType := mount.GetFsType()
+	mountOptions := mountCap.GetMountFlags()
+	fsType := mountCap.GetFsType()
 
 	klog.V(4).Infof("Volume %s with ID %s will be mounted on %s with type %s and options %s", volumeName, volumeID, stagingTargetPath, fsType, strings.Join(mountOptions, ","))
 
@@ -202,7 +201,7 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	if isMounted {
 		klog.V(4).Infof("Volume with ID %s is mounted on %s, umounting it", volumeID, stagingTargetPath)
-		err = mount.Unmount(stagingTargetPath)
+		err = d.diskUtils.Unmount(stagingTargetPath)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "error unmounting target path: %s", err.Error())
 		}
@@ -397,35 +396,14 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	klog.V(4).Infof("NodeUnpublishVolume called with %s", stripSecretFromReq(*req))
 
-	// check arguments
-	volumeID, _, err := getVolumeIDAndZone(req.GetVolumeId())
-	if err != nil {
-		return nil, err
-	}
-
 	targetPath := req.GetTargetPath()
 	if targetPath == "" {
 		return nil, status.Error(codes.InvalidArgument, "targetPath not provided")
 	}
 
-	_, err = d.diskUtils.GetDevicePath(volumeID)
+	err := d.diskUtils.Unmount(targetPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, status.Errorf(codes.NotFound, "volume with ID %s not found", volumeID)
-		}
-		return nil, status.Errorf(codes.Internal, "error getting device path for volume with ID %s: %s", volumeID, err.Error())
-	}
-
-	isMounted, err := d.diskUtils.IsSharedMounted(targetPath, "")
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "error checking if target is mounted: %s", err.Error())
-	}
-
-	if isMounted {
-		err = mount.Unmount(targetPath)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "error unmounting target path: %s", err.Error())
-		}
+		return nil, status.Errorf(codes.Internal, "error unmounting target path: %s", err.Error())
 	}
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
@@ -524,6 +502,13 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 				Type: &csi.NodeServiceCapability_Rpc{
 					Rpc: &csi.NodeServiceCapability_RPC{
 						Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+					},
+				},
+			},
+			&csi.NodeServiceCapability{
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 					},
 				},
 			},
