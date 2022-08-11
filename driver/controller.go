@@ -15,7 +15,7 @@ import (
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -27,12 +27,18 @@ var (
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
 		csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+		csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
+		csi.ControllerServiceCapability_RPC_GET_VOLUME,
+		csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 	}
 
 	// supportedAccessModes represents the supported access modes for the Scaleway Block Volumes
 	supportedAccessModes = []csi.VolumeCapability_AccessMode{
 		csi.VolumeCapability_AccessMode{
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		},
+		csi.VolumeCapability_AccessMode{
+			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
 		},
 	}
 
@@ -350,16 +356,17 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	if volumeResp.Volume.Server != nil && volumeResp.Volume.Server.ID != serverResp.Server.ID {
+	if volumeResp.Volume.Server != nil {
+		if volumeResp.Volume.Server.ID == serverResp.Server.ID {
+			return &csi.ControllerPublishVolumeResponse{
+				PublishContext: map[string]string{
+					scwVolumeName: volumeResp.Volume.Name,
+					scwVolumeID:   volumeResp.Volume.ID,
+					scwVolumeZone: volumeResp.Volume.Zone.String(),
+				},
+			}, nil
+		}
 		return nil, status.Errorf(codes.FailedPrecondition, "volume %s already attached to another node %s", volumeID, volumeResp.Volume.Server.ID)
-	} else if volumeResp.Volume.Server != nil {
-		return &csi.ControllerPublishVolumeResponse{
-			PublishContext: map[string]string{
-				scwVolumeName: volumeResp.Volume.Name,
-				scwVolumeID:   volumeResp.Volume.ID,
-				scwVolumeZone: volumeResp.Volume.Zone.String(),
-			},
-		}, nil
 	}
 
 	volumesCount := len(serverResp.Server.Volumes)
@@ -817,4 +824,39 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 	}
 
 	return &csi.ControllerExpandVolumeResponse{CapacityBytes: newSize, NodeExpansionRequired: nodeExpansionRequired}, nil
+}
+
+// ControllerGetVolume gets a specific volume.
+func (d *controllerService) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	klog.V(4).Infof("ControllerGetVolume called with %s", stripSecretFromReq(*req))
+	volumeID, volumeZone, err := getVolumeIDAndZone(req.GetVolumeId())
+	if err != nil {
+		return nil, err
+	}
+
+	volumeResp, err := d.scaleway.GetVolume(&instance.GetVolumeRequest{
+		VolumeID: volumeID,
+		Zone:     volumeZone,
+	})
+	if err != nil {
+		if _, ok := err.(*scw.ResourceNotFoundError); ok {
+			return nil, status.Errorf(codes.NotFound, "volume %s not found", volumeID)
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	var serversID []string
+	if volumeResp.Volume.Server != nil {
+		serversID = append(serversID, volumeResp.Volume.Zone.String()+"/"+volumeResp.Volume.Server.ID)
+	}
+
+	return &csi.ControllerGetVolumeResponse{
+		Volume: &csi.Volume{
+			VolumeId:      volumeResp.Volume.Zone.String() + "/" + volumeResp.Volume.ID,
+			CapacityBytes: int64(volumeResp.Volume.Size),
+		},
+		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+			PublishedNodeIds: serversID,
+		},
+	}, nil
 }

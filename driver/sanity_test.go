@@ -11,11 +11,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kubernetes-csi/csi-test/v3/pkg/sanity"
+	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	"github.com/scaleway/scaleway-csi/scaleway"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"golang.org/x/sys/unix"
+	kmount "k8s.io/mount-utils"
+	kexec "k8s.io/utils/exec"
 	utilsio "k8s.io/utils/io"
 )
 
@@ -27,16 +29,21 @@ type fakeHelper struct {
 func TestSanityCSI(t *testing.T) {
 	endpoint := "/tmp/csi-testing.sock"
 	nodeID := "fb094b6a-a732-4d5f-8283-bd6726ff5938"
-	volumesMap := make(map[string]*instance.Volume)
+	defaultVol := &instance.Volume{
+		ID:         "fb094b6a-b73b-4d5f-8283-bd6726ff5938",
+		VolumeType: instance.VolumeVolumeTypeLSSD,
+		Zone:       scw.ZoneFrPar1,
+		Name:       "local",
+	}
+	volumesMap := map[string]*instance.Volume{
+		defaultVol.ID: defaultVol,
+	}
 	serversMap := map[string]*instance.Server{
 		nodeID: &instance.Server{
 			ID: nodeID,
-			Volumes: map[string]*instance.Volume{"fb094b6a-b73b-4d5f-8283-bd6726ff5938": {
-				ID:         "fb094b6a-b73b-4d5f-8283-bd6726ff5938",
-				VolumeType: instance.VolumeVolumeTypeLSSD,
-				Zone:       scw.ZoneFrPar1,
-				Name:       "local",
-			}},
+			Volumes: map[string]*instance.VolumeServer{
+				"0": ConvertVolumeVolumeServer(defaultVol),
+			},
 			Zone: scw.ZoneFrPar1,
 		},
 	}
@@ -54,6 +61,10 @@ func TestSanityCSI(t *testing.T) {
 		defaultZone:  scw.ZoneFrPar1,
 	}
 	fakeDiskUtils := &fakeDiskUtils{
+		kMounter: &kmount.SafeFormatAndMount{
+			Interface: kmount.New(""),
+			Exec:      kexec.New(),
+		},
 		devices: diskUtilsDevices,
 	}
 	fakeHelper := &fakeHelper{
@@ -76,7 +87,7 @@ func TestSanityCSI(t *testing.T) {
 		},
 	}
 
-	go driver.Run() // an error here woule fail the test anyway since the grpc server would not be started
+	go driver.Run() // an error here would fail the test anyway since the grpc server would not be started
 
 	config := sanity.NewTestConfig()
 	config.Address = endpoint
@@ -91,6 +102,22 @@ func TestSanityCSI(t *testing.T) {
 	sanity.Test(t, config)
 	driver.srv.GracefulStop()
 	os.RemoveAll(endpoint)
+}
+
+func ConvertVolumeVolumeServer(vol *instance.Volume) *instance.VolumeServer {
+	return &instance.VolumeServer{
+		ID:               vol.ID,
+		Name:             vol.Name,
+		Organization:     vol.Organization,
+		Size:             vol.Size,
+		VolumeType:       instance.VolumeServerVolumeType(vol.VolumeType),
+		CreationDate:     vol.CreationDate,
+		ModificationDate: vol.ModificationDate,
+		State:            instance.VolumeServerStateAvailable,
+		Project:          vol.Project,
+		Boot:             false,
+		Zone:             vol.Zone,
+	}
 }
 
 type fakeInstanceAPI struct {
@@ -195,19 +222,34 @@ func (s *fakeHelper) GetServer(req *instance.GetServerRequest, opts ...scw.Reque
 func (s *fakeHelper) AttachVolume(req *instance.AttachVolumeRequest, opts ...scw.RequestOption) (*instance.AttachVolumeResponse, error) {
 	if vol, ok := s.volumesMap[req.VolumeID]; ok {
 		if srv, ok := s.serversMap[req.ServerID]; ok {
-			for i := 0; i <= len(srv.Volumes); i++ {
+			// emulate instance error if volume is already attached to server
+			for i := 0; i < maxVolumesPerNode; i++ {
 				key := fmt.Sprintf("%d", i)
 				if existingVol, ok := srv.Volumes[key]; ok && existingVol.ID == vol.ID {
-					break
+					return nil, &scw.InvalidArgumentsError{}
 				}
+			}
+
+			// add volume to volumes list
+			// We loop through all the possible volume keys (0 to len(volumes))
+			// to find a non existing key and assign it to the requested volume.
+			// A key should always be found. However we return an error if no keys were found.
+			found := false
+			for i := 0; i < maxVolumesPerNode; i++ {
+				key := fmt.Sprintf("%d", i)
 				if _, ok := srv.Volumes[key]; !ok {
 					vol.Server = &instance.ServerSummary{
 						ID: req.ServerID,
 					}
-					srv.Volumes[key] = vol
+					srv.Volumes[key] = ConvertVolumeVolumeServer(vol)
+					found = true
 					break
 				}
-			} // an empty slot will always be found
+			}
+			if !found {
+				return nil, fmt.Errorf("could not find key to attach volume %s", req.VolumeID)
+			}
+
 			s.devices[path.Join(diskByIDPath, diskSCWPrefix+req.VolumeID)] = &mountpoint{
 				block: true,
 			}
@@ -219,20 +261,19 @@ func (s *fakeHelper) AttachVolume(req *instance.AttachVolumeRequest, opts ...scw
 
 func (s *fakeHelper) DetachVolume(req *instance.DetachVolumeRequest, opts ...scw.RequestOption) (*instance.DetachVolumeResponse, error) {
 	if vol, ok := s.volumesMap[req.VolumeID]; ok {
-		delete(s.volumesMap, req.VolumeID)
-		delete(s.devices, path.Join(diskByIDPath, diskSCWPrefix+req.VolumeID))
-
 		if srv, ok := s.serversMap[vol.Server.ID]; ok {
-			for i := 0; i <= len(srv.Volumes); i++ {
-				key := fmt.Sprintf("%d", i)
-				if v, ok := srv.Volumes[key]; ok && v.ID == req.VolumeID {
+			// remove volume from volumes list
+			for key, volume := range srv.Volumes {
+				if volume.ID == req.VolumeID {
+					vol.Server = nil
 					delete(srv.Volumes, key)
 					break
 				}
-			} // an empty slot will always be found
-		}
+			}
 
-		return &instance.DetachVolumeResponse{}, nil
+			delete(s.devices, path.Join(diskByIDPath, diskSCWPrefix+req.VolumeID))
+			return &instance.DetachVolumeResponse{Server: srv}, nil
+		}
 	}
 	return nil, &scw.ResourceNotFoundError{}
 }
@@ -311,7 +352,8 @@ type mountpoint struct {
 }
 
 type fakeDiskUtils struct {
-	devices map[string]*mountpoint
+	kMounter *kmount.SafeFormatAndMount
+	devices  map[string]*mountpoint
 }
 
 // FormatAndMount is only used for non block devices
@@ -327,6 +369,10 @@ func (s *fakeHelper) FormatAndMount(targetPath string, devicePath string, fsType
 		block:        false,
 	}
 	return nil
+}
+
+func (s *fakeHelper) Unmount(target string) error {
+	return kmount.CleanupMountPoint(target, s.kMounter, true)
 }
 
 func (s *fakeHelper) MountToTarget(sourcePath, targetPath, fsType string, mountOptions []string) error {
@@ -481,19 +527,7 @@ func (s *fakeHelper) GetStatfs(path string) (*unix.Statfs_t, error) {
 }
 
 func (s *fakeHelper) Resize(targetPath string, devicePath string) error {
-	mountInfo, err := s.GetMountInfo(targetPath)
-	if err != nil {
-		return err
-	}
-
-	switch mountInfo.fsType {
-	case "ext3", "ext4":
-		return nil
-	case "xfs":
-		return nil
-	}
-
-	return fmt.Errorf("filesystem %s does not support resizing", mountInfo.fsType)
+	return nil
 }
 
 func (s *fakeHelper) EncryptAndOpenDevice(volumeID string, passphrase string) (string, error) {

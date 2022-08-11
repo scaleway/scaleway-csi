@@ -11,7 +11,7 @@ import (
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func getSnapshotIDAndZone(id string) (string, scw.Zone, error) {
