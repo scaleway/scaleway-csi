@@ -16,11 +16,13 @@ import (
 )
 
 const (
-	// maximum of volumes per node
-	maxVolumesPerNode = 16
-
 	// name of the secret for the encryption passphrase
 	encryptionPassphraseKey = "encryptionPassphrase"
+)
+
+var (
+	// maximum of volumes per node
+	maxVolumesPerNode = 16
 )
 
 type nodeService struct {
@@ -30,11 +32,13 @@ type nodeService struct {
 	nodeZone scw.Zone
 }
 
-func newNodeService() nodeService {
+func newNodeService(nodeconfig *NodeConfig) nodeService {
 	metadata, err := scaleway.NewMetadata().GetMetadata()
 	if err != nil {
 		panic(err)
 	}
+
+	maxVolumesPerNode = nodeconfig.VolumeNumber
 
 	zone, err := scw.ParseZone(metadata.Location.ZoneID)
 	if err != nil {
@@ -520,7 +524,7 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	return &csi.NodeGetInfoResponse{
 		NodeId:            d.nodeZone.String() + "/" + d.nodeID,
-		MaxVolumesPerNode: maxVolumesPerNode - 1, // One is already used by the l_ssd root volume
+		MaxVolumesPerNode: int64(maxVolumesPerNode - 1), // One is already used by the l_ssd root volume
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{
 				ZoneTopologyKey: d.nodeZone.String(),

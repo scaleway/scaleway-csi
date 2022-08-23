@@ -44,34 +44,40 @@ type DriverConfig struct {
 	Mode     Mode
 }
 
+type NodeConfig struct {
+	VolumeNumber int
+}
+
 // Driver implements the interfaces csi.IdentityServer, csi.ControllerServer and csi.NodeServer
 type Driver struct {
 	controllerService
 	nodeService
 
-	config *DriverConfig
+	driverconfig *DriverConfig
+	nodeconfig   *NodeConfig
 
 	srv *grpc.Server
 }
 
 // NewDriver returns a CSI plugin
-func NewDriver(config *DriverConfig) (*Driver, error) {
+func NewDriver(driverconfig *DriverConfig, nodeconfig *NodeConfig) (*Driver, error) {
 	klog.Infof("Driver: %s Version: %s", DriverName, driverVersion)
 
 	driver := &Driver{
-		config: config,
+		driverconfig: driverconfig,
+		nodeconfig:   nodeconfig,
 	}
 
-	switch config.Mode {
+	switch driverconfig.Mode {
 	case ControllerMode:
-		driver.controllerService = newControllerService(config)
+		driver.controllerService = newControllerService(driverconfig)
 	case NodeMode:
-		driver.nodeService = newNodeService()
+		driver.nodeService = newNodeService(nodeconfig)
 	case AllMode:
-		driver.controllerService = newControllerService(config)
-		driver.nodeService = newNodeService()
+		driver.controllerService = newControllerService(driverconfig)
+		driver.nodeService = newNodeService(nodeconfig)
 	default:
-		return nil, fmt.Errorf("unknown mode for driver: %s", config.Mode)
+		return nil, fmt.Errorf("unknown mode for driver: %s", driverconfig.Mode)
 	}
 
 	return driver, nil

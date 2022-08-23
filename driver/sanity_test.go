@@ -54,6 +54,9 @@ func TestSanityCSI(t *testing.T) {
 		Endpoint: fmt.Sprintf("unix://%s", endpoint),
 		Mode:     AllMode,
 	}
+	nodeConfig := &NodeConfig{
+		VolumeNumber: 16,
+	}
 	fakeInstance := &fakeInstanceAPI{
 		volumesMap:   volumesMap,
 		serversMap:   serversMap,
@@ -73,7 +76,8 @@ func TestSanityCSI(t *testing.T) {
 	}
 
 	driver := &Driver{
-		config: driverConfig,
+		driverconfig: driverConfig,
+		nodeconfig:   nodeConfig,
 		controllerService: controllerService{
 			scaleway: &scaleway.Scaleway{
 				InstanceAPI: fakeHelper,
