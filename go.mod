@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/kubernetes-csi/csi-test/v5 v5.0.0
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.9
-	golang.org/x/sys v0.0.0-20220731174439-a90be440212d
+	golang.org/x/sys v0.5.0
 	google.golang.org/grpc v1.48.0
 	k8s.io/klog/v2 v2.70.1
 	k8s.io/mount-utils v0.24.3
@@ -20,8 +20,8 @@ require (
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/onsi/ginkgo/v2 v2.1.4 // indirect
 	github.com/onsi/gomega v1.20.0 // indirect
-	golang.org/x/net v0.0.0-20220802222814-0bcc04d9c69b // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/net v0.7.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/genproto v0.0.0-20201209185603-f92720507ed4 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
