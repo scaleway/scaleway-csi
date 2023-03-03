@@ -2,7 +2,7 @@
 
 The [Scaleway Block Volume](https://www.scaleway.com/en/block-storage/) Container Storage Interface (CSI) driver is an implementation of the [CSI interface](https://github.com/container-storage-interface/spec/blob/master/spec.md) to provide a way to manage Scaleway Block Volumes through a container orchestration system, like Kubernetes.
 
-**WARNING**: this project is under active development and should be considered alpha.
+**WARNING**: ⚠️ This project is under active development and should be considered alpha.
 
 ### CSI Specification Compability Matrix
 
@@ -35,7 +35,7 @@ spec:
 
 #### At-Rest Encryption
 
-Support for volume encryption. [see in exemples](https://github.com/scaleway/scaleway-csi/tree/master/examples/kubernetes#encrypting-volumes)
+Support for volume encryption with Cryptsetup/LUKS. [See more details in examples](https://github.com/scaleway/scaleway-csi/tree/master/examples/kubernetes#encrypting-volumes)
 
 #### Volume Snapshots
 
@@ -47,7 +47,7 @@ The Scaleway CSI driver implements the [`NodeGetVolumeStats`](https://github.com
 
 ## Kubernetes
 
-This section is Kubernetes specific. Note that Scaleway CSI driver may work for older Kubernetes version than those announced.
+This section is Kubernetes specific. Note that Scaleway CSI driver may work for older Kubernetes versions than those announced.
 The CSI driver allows to use [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) in Kubernetes.
 
 ### Kubernetes Version Compability Matrix
@@ -73,7 +73,7 @@ These steps will cover how to install the Scaleway CSI driver in your Kubernetes
 
 #### Deployment
 
-1. Configure the Scalewy secrets.
+1. Configure the Scaleway secrets.
 
 Edit the [secret file](./deploy/kubernetes/scaleway-secret.yaml) in order to set your own secrets.
 Once replaced, you can create the secret:
