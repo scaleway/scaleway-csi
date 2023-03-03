@@ -1,8 +1,8 @@
 # Kubernetes examples
 
-You can found in this directory some examples about how to use the Scaleway CSI driver inside Kubernetes.
+You can find in this directory some examples about how to use the Scaleway CSI driver inside Kubernetes.
 
-It will cover [Persistent Volumes/Persistent Volume Claim (PV/PVC)](https://kubernetes.io/docs/concepts/storage/persistent-volumes/), [Storage Class](https://kubernetes.io/docs/concepts/storage/storage-classes/) and [Volume Snapshots](https://kubernetes.io/docs/concepts/storage/volume-snapshots/)
+It will cover [Persistent Volumes/Persistent Volume Claim (PV/PVC)](https://kubernetes.io/docs/concepts/storage/persistent-volumes/), [Storage Class](https://kubernetes.io/docs/concepts/storage/storage-classes/) and [Volume Snapshots](https://kubernetes.io/docs/concepts/storage/volume-snapshots/).
 
 If a [StorageClass](https://kubernetes.io/docs/concepts/storage/storage-classes/) is not provided in the examples, the `scw-bssd` storage class will be used.
 
@@ -182,7 +182,7 @@ parameters:
 
 ### Choose the type of Scaleway Block Volume
 
-When the new type of Scaleway Block Volume will be available, let's say it's called `b_ssd+`, you will need to add the `type` parameter to the storage class:
+When a new type of Scaleway Block Volume will be available, let's say it's called `b_ssd+`, you will need to add the `type` parameter to the storage class:
 ```yaml
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
@@ -221,7 +221,7 @@ This plugin supports at rest encryption of the volumes with Cryptsetup/LUKS.
 ### Storage Class parameters
 
 In order to have an encrypted volume, `encrypted: true` needs to be added to the StorageClass parameters.
-You will also need an passphrase to encrypt/decrypt the volume, which is take from the secrets passed to the `NodeStageVolume` method.
+You will also need a passphrase to encrypt/decrypt the volume, which is taken from the secrets passed to the `NodeStageVolume` method.
 
 The [external-provisioner](https://github.com/kubernetes-csi/external-provisioner) can be used to [pass down the wanted secret to the CSI plugin](https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html) (v1.0.1+).
 
