@@ -3,6 +3,7 @@ package driver
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -54,6 +55,27 @@ func luksClose(mapperFile string) error {
 	luksCloseCmd := exec.Command(cryptsetupCmd, args...)
 
 	return luksCloseCmd.Run()
+}
+
+func luksResize(mapperFile, passphrase string) error {
+	args := []string{
+		"resize",                   // resize
+		mapperFile,                 // mapper file to resize
+		"--key-file", "/dev/stdin", // read the passphrase from stdin
+	}
+
+	luksResizeCmd := exec.Command(cryptsetupCmd, args...)
+
+	luksResizeCmd.Stdin = strings.NewReader(passphrase)
+	o := &bytes.Buffer{}
+	e := &bytes.Buffer{}
+	luksResizeCmd.Stdout = o
+	luksResizeCmd.Stderr = e
+
+	if err := luksResizeCmd.Run(); err != nil {
+		return fmt.Errorf("luks resize failed: %v, stdout: %s, stderr: %s", err, o.String(), e.String())
+	}
+	return nil
 }
 
 func luksStatus(mapperFile string) ([]byte, error) {

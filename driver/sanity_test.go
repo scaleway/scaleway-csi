@@ -12,13 +12,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
-	"github.com/scaleway/scaleway-csi/scaleway"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"golang.org/x/sys/unix"
 	kmount "k8s.io/mount-utils"
 	kexec "k8s.io/utils/exec"
 	utilsio "k8s.io/utils/io"
+
+	"github.com/scaleway/scaleway-csi/scaleway"
 )
 
 type fakeHelper struct {
@@ -526,8 +527,12 @@ func (s *fakeHelper) GetStatfs(path string) (*unix.Statfs_t, error) {
 	}, nil
 }
 
-func (s *fakeHelper) Resize(targetPath string, devicePath string) error {
+func (s *fakeHelper) Resize(targetPath string, devicePath, passphrase string) error {
 	return nil
+}
+
+func (s *fakeHelper) IsEncrypted(devicePath string) (bool, error) {
+	return false, nil
 }
 
 func (s *fakeHelper) EncryptAndOpenDevice(volumeID string, passphrase string) (string, error) {
