@@ -38,7 +38,7 @@ spec:
       hostNetwork: true
       containers:
         - name: scaleway-csi-plugin
-          image: scaleway/scaleway-csi:v0.1.7
+          image: scaleway/scaleway-csi:v0.2.0
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--v=4"

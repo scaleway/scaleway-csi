@@ -313,7 +313,7 @@ func (s *fakeHelper) CreateSnapshot(req *instance.CreateSnapshotRequest, opts ..
 		req.Zone = s.defaultZone
 	}
 
-	volume, ok := s.volumesMap[req.VolumeID]
+	volume, ok := s.volumesMap[*req.VolumeID]
 	if !ok {
 		return nil, &scw.ResourceNotFoundError{}
 	}
