@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/scaleway/scaleway-csi/scaleway"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
+
+	"github.com/scaleway/scaleway-csi/scaleway"
 )
 
 const (
@@ -573,8 +574,25 @@ func (d *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return &csi.NodeExpandVolumeResponse{}, nil
 	}
 
-	err = d.diskUtils.Resize(volumePath, devicePath)
+	klog.V(4).Infof("resizing volume %s mounted on %s", volumeID, volumePath)
+	encrypted, err := d.diskUtils.IsEncrypted(devicePath)
 	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error checking if volume %s is encrypted: %s", volumeID, err.Error())
+	}
+
+	passphrase := req.GetSecrets()[encryptionPassphraseKey]
+	if encrypted {
+		devicePath, err = d.diskUtils.GetMappedDevicePath(volumeID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "error retrieving mapped device path for volume with ID %s: %s", volumeID, err.Error())
+		}
+		klog.V(4).Infof("mapped device path for volume %s is %s", volumeID, devicePath)
+		if passphrase == "" {
+			return nil, status.Errorf(codes.InvalidArgument, "device %s is LUKS encrypted, but no passphrase was provided", devicePath)
+		}
+	}
+
+	if err = d.diskUtils.Resize(volumePath, devicePath, passphrase); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to resize volume %s mounted on %s: %v", volumeID, volumePath, err)
 	}
 

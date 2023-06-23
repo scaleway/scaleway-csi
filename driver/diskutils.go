@@ -59,8 +59,11 @@ type DiskUtils interface {
 	// GetStatfs return the statfs struct for the given path
 	GetStatfs(path string) (*unix.Statfs_t, error)
 
-	// Resize resizes the given volumes
-	Resize(targetPath string, devicePath string) error
+	// Resize resizes the given volumes, it will try to resize the LUKS device first if the passphrase is provided
+	Resize(targetPath string, devicePath, passphrase string) error
+
+	// IsEncrypted returns true if the device with the given path is encrypted with LUKS
+	IsEncrypted(devicePath string) (bool, error)
 
 	// EncryptAndOpenDevice encrypts the volume with the given ID with the given passphrase and open it
 	// If the device is already encrypted (LUKS header present), it will only open the device
@@ -162,7 +165,9 @@ func (d *diskUtils) GetMappedDevicePath(volumeID string) (string, error) {
 
 	// first line should look like
 	// /dev/mapper/<name> is active.
-	if !strings.HasSuffix(statusLines[0], "is active.") {
+	// or
+	// /dev/mapper/<name> is active and is in use.
+	if !strings.HasSuffix(statusLines[0], "is active.") && !strings.HasSuffix(statusLines[0], "is active and is in use.") {
 		// when a device is not active, an error exit code is thrown
 		// something went wrong if we reach here
 		return "", fmt.Errorf("luksStatus returned ok, but device %s is not active", diskLuksMapperPrefix+volumeID)
@@ -431,11 +436,24 @@ func (d *diskUtils) GetStatfs(path string) (*unix.Statfs_t, error) {
 	return fs, err
 }
 
-func (d *diskUtils) Resize(targetPath string, devicePath string) error {
+func (d *diskUtils) IsEncrypted(devicePath string) (bool, error) {
+	return luksIsLuks(devicePath)
+}
+
+func (d *diskUtils) Resize(targetPath string, devicePath, passphrase string) error {
 	mountInfo, err := d.GetMountInfo(targetPath)
 	if err != nil {
 		return err
 	}
+
+	if passphrase != "" {
+		klog.V(4).Infof("resizing LUKS device %s", devicePath)
+		if err := luksResize(devicePath, passphrase); err != nil {
+			return err
+		}
+	}
+
+	klog.V(4).Infof("resizing filesystem %s on %s", mountInfo.fsType, devicePath)
 
 	switch mountInfo.fsType {
 	case "ext3", "ext4":

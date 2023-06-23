@@ -245,7 +245,8 @@ data:
 
 and the following StorageClass:
 ```yaml
-allowVolumeExpansion: false # not yet supported
+# Volume expansion is supported with CSINodeExpandSecret feature gate since v1.25.0 or by default since v1.27.0
+allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -257,6 +258,9 @@ parameters:
   encrypted: "true"
   csi.storage.k8s.io/node-stage-secret-name: "enc-secret"
   csi.storage.k8s.io/node-stage-secret-namespace: "default"
+  # Required for volume expansion
+  csi.storage.k8s.io/node-expand-secret-name: "enc-secret"
+  csi.storage.k8s.io/node-expand-secret-namespace: "default"
 ```
 
 all the PVC created with the StorageClass `scw-bssd-enc` will be encrypted at rest with the passphrase `myawesomepassphrase`.
