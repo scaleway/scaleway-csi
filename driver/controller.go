@@ -456,7 +456,7 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 // ValidateVolumeCapabilities check if a pre-provisioned volume has all the capabilities
 // that the CO wants. This RPC call SHALL return confirmed only if all the
 // volume capabilities specified in the request are supported.
-//This operation MUST be idempotent.
+// This operation MUST be idempotent.
 func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	klog.V(4).Infof("ValidateVolumeCapabilities called with %s", stripSecretFromReq(*req))
 	volumeID, volumeZone, err := getVolumeIDAndZone(req.GetVolumeId())
@@ -620,7 +620,7 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}
 
 	snapshotResp, err := d.scaleway.CreateSnapshot(&instance.CreateSnapshotRequest{
-		VolumeID: sourceVolumeID,
+		VolumeID: &sourceVolumeID,
 		Name:     name,
 		Zone:     sourceVolumeZone,
 	})
