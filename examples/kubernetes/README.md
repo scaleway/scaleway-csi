@@ -216,18 +216,20 @@ allowedTopologies:
 
 This plugin supports at rest encryption of the volumes with Cryptsetup/LUKS.
 
-**Note that resizing an encrypted volume does not work (https://github.com/container-storage-interface/spec/issues/445)**
-
 ### Storage Class parameters
 
 In order to have an encrypted volume, `encrypted: true` needs to be added to the StorageClass parameters.
-You will also need a passphrase to encrypt/decrypt the volume, which is taken from the secrets passed to the `NodeStageVolume` method.
+You will also need a passphrase to encrypt/decrypt the volume, which is taken from the secrets passed to the `NodeStageVolume` and `NodeExpandVolume` method.
 
 The [external-provisioner](https://github.com/kubernetes-csi/external-provisioner) can be used to [pass down the wanted secret to the CSI plugin](https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html) (v1.0.1+).
 
-Two additional parameters are needed on the StorageClass:
+Some additional parameters are needed on the StorageClass:
 - `csi.storage.k8s.io/node-stage-secret-name`: The name of the secret
 - `csi.storage.k8s.io/node-stage-secret-namespace`: The namespace of the secret
+- `csi.storage.k8s.io/node-expand-secret-name`: The name of the secret (see note below).
+- `csi.storage.k8s.io/node-expand-secret-namespace`: The namespace of the secret (see note below).
+
+> Volume expansion for encrypted volumes is only supported with the `CSINodeExpandSecret` feature gate which is available since `v1.25.0` and by default since `v1.27.0`.
 
 The secret needs to have the passphrase in the entry with the key `encryptionPassphrase`.
 
@@ -266,3 +268,6 @@ parameters:
 all the PVC created with the StorageClass `scw-bssd-enc` will be encrypted at rest with the passphrase `myawesomepassphrase`.
 
 The [Per Volume Secret](https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html#per-volume-secrets) can also be used to avoid having one passphrase per StorageClass.
+
+Please note that prior to `v0.2.1` the expansion of encrypted volume was not possible, `PV` created without the `csi.storage.k8s.io/node-stage-secret` annotations will need to be patched by hand if expansion is needed.
+Be sure to be extra carefull doing so as the needed fields are immutable and you'll need to force the patch (backup any data, switch the `reclaimPolicy` of the volume to `Retain`, ...).
