@@ -182,23 +182,11 @@ func (d *diskUtils) FormatAndMount(targetPath string, devicePath string, fsType 
 	}
 
 	klog.V(4).Infof("Attempting to mount %s on %s with type %s", devicePath, targetPath, fsType)
-	err := d.MountToTarget(devicePath, targetPath, fsType, mountOptions)
-	if err != nil {
-		klog.V(4).Infof("Mount attempt failed, trying to format device %s with type %s", devicePath, fsType)
-		realFsType, fsErr := d.getDeviceType(devicePath)
-		if fsErr != nil {
-			return fsErr
-		}
 
-		if realFsType == "" {
-			fsErr = d.formatDevice(devicePath, fsType)
-			if fsErr != nil {
-				return fsErr
-			}
-			return d.MountToTarget(devicePath, targetPath, fsType, mountOptions)
-		}
-		return err
+	if err := d.kMounter.FormatAndMount(devicePath, targetPath, fsType, mountOptions); err != nil {
+		return fmt.Errorf("failed to optionnaly format and mount: %w", err)
 	}
+
 	return nil
 }
 
@@ -216,66 +204,6 @@ func (d *diskUtils) MountToTarget(sourcePath, targetPath, fsType string, mountOp
 	}
 
 	return nil
-}
-
-func (d *diskUtils) formatDevice(devicePath string, fsType string) error {
-	if fsType == "" {
-		fsType = defaultFSType
-	}
-
-	mkfsPath, err := exec.LookPath("mkfs." + fsType)
-	if err != nil {
-		return err
-	}
-
-	mkfsArgs := []string{devicePath}
-	if fsType == "ext4" || fsType == "ext3" {
-		mkfsArgs = []string{
-			"-F",  // Force mke2fs to create a filesystem
-			"-m0", // 0 blocks reserved for the super-user
-			devicePath,
-		}
-	}
-
-	return exec.Command(mkfsPath, mkfsArgs...).Run()
-}
-
-func (d *diskUtils) getDeviceType(devicePath string) (string, error) {
-	blkidPath, err := exec.LookPath("blkid")
-	if err != nil {
-		return "", err
-	}
-
-	blkidArgs := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", devicePath}
-	blkidOutputBytes, err := exec.Command(blkidPath, blkidArgs...).Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if exitErr.ExitCode() == 2 {
-				// From man page of blkid:
-				// If the specified token was not found, or no (specified) devices
-				// could be identified, or it is impossible to gather
-				// any information about the device identifiers
-				// or device content an exit code of 2 is returned.
-				return "", nil
-			}
-		}
-		return "", err
-	}
-
-	blkidOutput := string(blkidOutputBytes)
-	blkidOutputLines := strings.Split(blkidOutput, "\n")
-	for _, blkidLine := range blkidOutputLines {
-		if len(blkidLine) == 0 {
-			continue
-		}
-
-		blkidLineSplit := strings.Split(blkidLine, "=")
-		if blkidLineSplit[0] == "TYPE" && len(blkidLineSplit[1]) > 0 {
-			return blkidLineSplit[1], nil
-		}
-	}
-	// TODO real error???
-	return "", nil
 }
 
 func (d *diskUtils) GetDevicePath(volumeID string) (string, error) {

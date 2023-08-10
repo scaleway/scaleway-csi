@@ -3,7 +3,6 @@ package driver
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"strconv"
 	"strings"
@@ -388,44 +387,6 @@ func (s *fakeHelper) MountToTarget(sourcePath, targetPath, fsType string, mountO
 		block:        strings.HasPrefix(sourcePath, diskByIDPath),
 	}
 	return nil
-}
-
-func (s *fakeHelper) getDeviceType(devicePath string) (string, error) {
-	blkidPath, err := exec.LookPath("blkid")
-	if err != nil {
-		return "", err
-	}
-
-	blkidArgs := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", devicePath}
-	blkidOutputBytes, err := exec.Command(blkidPath, blkidArgs...).Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if exitErr.ExitCode() == 2 {
-				// From man page of blkid:
-				// If the specified token was not found, or no (specified) devices
-				// could be identified, or it is impossible to gather
-				// any information about the device identifiers
-				// or device content an exit code of 2 is returned.
-				return "", nil
-			}
-		}
-		return "", err
-	}
-
-	blkidOutput := string(blkidOutputBytes)
-	blkidOutputLines := strings.Split(blkidOutput, "\n")
-	for _, blkidLine := range blkidOutputLines {
-		if len(blkidLine) == 0 {
-			continue
-		}
-
-		blkidLineSplit := strings.Split(blkidLine, "=")
-		if blkidLineSplit[0] == "TYPE" && len(blkidLineSplit[1]) > 0 {
-			return blkidLineSplit[1], nil
-		}
-	}
-	// TODO real error???
-	return "", nil
 }
 
 func (s *fakeHelper) GetDevicePath(volumeID string) (string, error) {
