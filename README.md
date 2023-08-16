@@ -64,40 +64,51 @@ Some examples are available [here](./examples/kubernetes).
 
 ### Installation
 
-These steps will cover how to install the Scaleway CSI driver in your Kubernetes cluster.
+These steps will cover how to install the Scaleway CSI driver in your Kubernetes cluster, using Helm.
+
+> **Warning**
+> Please note that the manifest files provided in `deploy/kubernetes` are deprecated and
+> no longer maintained.
 
 #### Requirements
 
-* A Kubernetes cluster running on Scaleway instances (v1.17+)
+* A Kubernetes cluster running on Scaleway instances (v1.20+)
 * Scaleway Project or Organization ID, Access and Secret key
+* Helm v3
 
 #### Deployment
 
-1. Configure the Scaleway secrets.
+1. Add the Scaleway Helm repository.
 
-Edit the [secret file](./deploy/kubernetes/scaleway-secret.yaml) in order to set your own secrets.
-Once replaced, you can create the secret:
-```bash
-$ kubectl apply -f ./deploy/kubernetes/scaleway-secret.yaml
-```
+    ```bash
+    helm repo add scaleway https://helm.scw.cloud/
+    helm repo update
+    ```
 
-2. Deploy the Scaleway CSI driver and the needed sidecars.
+2. Deploy the latest release of the `scaleway-csi` Helm chart.
 
-It's recommended to deploy the latest tagged version, but you can also deploy the master version. Here we will deploy the latest version `0.1.4`.
-```bash
-$ kubectl create -f ./deploy/kubernetes/scaleway-csi-v0.1.4.yaml
-```
+    ```bash
+    helm upgrade --install scaleway-csi --namespace kube-system scaleway/scaleway-csi \
+        --set controller.scaleway.env.SCW_DEFAULT_ZONE=fr-par-1 \
+        --set controller.scaleway.env.SCW_DEFAULT_PROJECT_ID=11111111-1111-1111-1111-111111111111 \
+        --set controller.scaleway.env.SCW_ACCESS_KEY=ABCDEFGHIJKLMNOPQRST \
+        --set controller.scaleway.env.SCW_SECRET_KEY=11111111-1111-1111-1111-111111111111
+    ```
 
-You can now verify that the driver is running:
-```bash
-$ kubectl get pods -n kube-system
-[...]
-scaleway-csi-controller-76897b577d-b4dgw   5/5     Running   0          3m
-scaleway-csi-node-hvkfw                    3/3     Running   0          3m
-scaleway-csi-node-jmrz2                    3/3     Running   0          3m
-[...]
-```
-and you should see the scaleway-csi-controller and the scaleway-csi-node pods.
+    Review the [configuration values](https://github.com/scaleway/helm-charts/blob/master/charts/scaleway-csi/values.yaml) for the Helm chart.
+
+3. You can now verify that the driver is running:
+
+    ```bash
+    $ kubectl get pods -n kube-system
+    [...]
+    scaleway-csi-controller-76897b577d-b4dgw   8/8     Running   0          3m
+    scaleway-csi-node-hvkfw                    3/3     Running   0          3m
+    scaleway-csi-node-jmrz2                    3/3     Running   0          3m
+    [...]
+    ```
+
+    You should see the scaleway-csi-controller and the scaleway-csi-node pods.
 
 ## Development
 
