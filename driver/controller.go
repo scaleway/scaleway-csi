@@ -9,12 +9,12 @@ import (
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/scaleway/scaleway-csi/scaleway"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"k8s.io/klog/v2"
 )
 
@@ -506,7 +506,7 @@ func (d *controllerService) ListVolumes(ctx context.Context, req *csi.ListVolume
 		}
 	}
 
-	volumesResp, err := d.scaleway.ListVolumes(&instance.ListVolumesRequest{}, scw.WithAllPages())
+	volumesResp, err := d.scaleway.ListVolumes(&instance.ListVolumesRequest{}, scw.WithContext(ctx), scw.WithAllPages())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -605,12 +605,7 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 		}
 
 		if snapshot.CreationDate != nil {
-			creationTime, err := ptypes.TimestampProto(*snapshot.CreationDate)
-			if err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
-			}
-			snapshotResp.CreationTime = creationTime
-
+			snapshotResp.CreationTime = timestamppb.New(*snapshot.CreationDate)
 		}
 
 		return &csi.CreateSnapshotResponse{
@@ -636,11 +631,7 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	}
 
 	if snapshotResp.Snapshot.CreationDate != nil {
-		creationTime, err := ptypes.TimestampProto(*snapshotResp.Snapshot.CreationDate)
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-		snapshotProtoResp.CreationTime = creationTime
+		snapshotProtoResp.CreationTime = timestamppb.New(*snapshotResp.Snapshot.CreationDate)
 	}
 
 	return &csi.CreateSnapshotResponse{
@@ -689,23 +680,41 @@ func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	}
 
 	// TODO fix zones
-	snapshotID, _, _ := getSnapshotIDAndZone(req.GetSnapshotId())
-	sourceVolumeID, _, _ := getSourceVolumeIDAndZone(req.GetSourceVolumeId())
+	snapshotID, snapshotZone, _ := getSnapshotIDAndZone(req.GetSnapshotId())
+	sourceVolumeID, sourceVolumeZone, _ := getSourceVolumeIDAndZone(req.GetSourceVolumeId())
 
-	// TODO all zones
-	snapshotsResp, err := d.scaleway.ListSnapshots(&instance.ListSnapshotsRequest{}, scw.WithAllPages())
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
 	snapshots := []*instance.Snapshot{}
-	for _, snap := range snapshotsResp.Snapshots {
-		if snapshotID != "" && snap.ID == snapshotID {
-			snapshots = []*instance.Snapshot{snap}
-			break
+	switch {
+	case req.SnapshotId != "":
+		snapshotResp, err := d.scaleway.GetSnapshot(&instance.GetSnapshotRequest{
+			SnapshotID: snapshotID,
+			Zone:       snapshotZone,
+		}, scw.WithContext(ctx))
+		if err != nil {
+			// not found should return empty list
+			if _, ok := err.(*scw.ResourceNotFoundError); ok {
+				return &csi.ListSnapshotsResponse{
+					Entries: []*csi.ListSnapshotsResponse_Entry{},
+				}, nil
+			}
+			return nil, status.Error(codes.Internal, err.Error())
 		}
-		if sourceVolumeID != "" && snap.BaseVolume != nil && snap.BaseVolume.ID == sourceVolumeID || snapshotID == "" && sourceVolumeID == "" {
-			snapshots = append(snapshots, snap)
+		snapshots = []*instance.Snapshot{snapshotResp.Snapshot}
+	case sourceVolumeID != "":
+		snapshotsResp, err := d.scaleway.ListSnapshots(&instance.ListSnapshotsRequest{
+			BaseVolumeID: &sourceVolumeID,
+			Zone:         sourceVolumeZone,
+		}, scw.WithContext(ctx), scw.WithAllPages())
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
 		}
+		snapshots = snapshotsResp.Snapshots
+	default:
+		snapshotsResp, err := d.scaleway.ListSnapshots(&instance.ListSnapshotsRequest{}, scw.WithContext(ctx), scw.WithAllPages())
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		snapshots = snapshotsResp.Snapshots
 	}
 
 	nextPage := ""
@@ -738,11 +747,7 @@ func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		}
 
 		if snap.CreationDate != nil {
-			creationTime, err := ptypes.TimestampProto(*snap.CreationDate)
-			if err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
-			}
-			snapshotProtoResp.CreationTime = creationTime
+			snapshotProtoResp.CreationTime = timestamppb.New(*snap.CreationDate)
 		}
 
 		snapshotsEntries = append(snapshotsEntries, &csi.ListSnapshotsResponse_Entry{

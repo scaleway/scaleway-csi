@@ -298,12 +298,18 @@ func (s *fakeHelper) GetSnapshot(req *instance.GetSnapshotRequest, opts ...scw.R
 func (s *fakeHelper) ListSnapshots(req *instance.ListSnapshotsRequest, opts ...scw.RequestOption) (*instance.ListSnapshotsResponse, error) {
 	snapshots := make([]*instance.Snapshot, 0)
 	for _, snap := range s.snapshotsMap {
-		if req.Name == nil || strings.Contains(snap.Name, *req.Name) {
-			if snap.State == instance.SnapshotStateSnapshotting {
-				snap.State = instance.SnapshotStateAvailable
-			}
-			snapshots = append(snapshots, snap)
+		if req.BaseVolumeID != nil && (snap.BaseVolume == nil || *req.BaseVolumeID != snap.BaseVolume.ID) {
+			continue
 		}
+
+		if req.Name != nil && !strings.Contains(snap.Name, *req.Name) {
+			continue
+		}
+
+		if snap.State == instance.SnapshotStateSnapshotting {
+			snap.State = instance.SnapshotStateAvailable
+		}
+		snapshots = append(snapshots, snap)
 	}
 	return &instance.ListSnapshotsResponse{Snapshots: snapshots, TotalCount: uint32(len(snapshots))}, nil
 }
