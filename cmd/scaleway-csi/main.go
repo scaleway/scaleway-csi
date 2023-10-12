@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/scaleway/scaleway-csi/driver"
+	"github.com/scaleway/scaleway-csi/pkg/driver"
 	"k8s.io/klog/v2"
 )
 

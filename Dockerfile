@@ -9,8 +9,7 @@ COPY go.sum go.sum
 RUN go mod download
 
 COPY cmd/ cmd/
-COPY scaleway/ scaleway/
-COPY driver/ driver/
+COPY pkg/ pkg/
 
 ARG TAG
 ARG COMMIT_SHA

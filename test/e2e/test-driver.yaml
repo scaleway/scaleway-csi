@@ -1,0 +1,25 @@
+StorageClass:
+  FromName: true
+SnapshotClass:
+  FromName: true
+DriverInfo:
+  Name: csi.scaleway.com
+  Capabilities:
+    block: true
+    controllerExpansion: true
+    nodeExpansion: true
+    exec: true
+    multipods: true
+    persistence: true
+    snapshotDataSource: true
+    topology: true
+    onlineExpansion: true
+    singleNodeVolume: true
+  SupportedFsType:
+    ext3:
+    ext4: {}
+    xfs: {}
+  TopologyKeys:
+    - topology.csi.scaleway.com/zone
+InlineVolumes:
+- Attributes: {}

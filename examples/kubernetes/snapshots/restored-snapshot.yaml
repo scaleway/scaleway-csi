@@ -5,7 +5,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: scw-bssd
+  storageClassName: sbs-default
   resources:
     requests:
       storage: 5Gi
