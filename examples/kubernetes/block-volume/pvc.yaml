@@ -8,5 +8,5 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: scw-bssd
+  storageClassName: sbs-default
   volumeMode: Block

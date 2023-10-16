@@ -53,7 +53,7 @@ func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCa
 
 // Probe allows to verify that the plugin is in a healthy and ready state
 func (d *Driver) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	//TODO
+	// TODO
 	return &csi.ProbeResponse{
 		Ready: &wrappers.BoolValue{
 			Value: true,

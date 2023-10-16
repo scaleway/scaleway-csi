@@ -25,7 +25,11 @@ clean:
 
 .PHONY: test
 test:
-	go test -timeout=1m -v -race -short ./...
+	go test -timeout=1m -v -race -short `go list ./... | grep -v /test`
+
+.PHONY: test-sanity
+test-sanity:
+	go test -count=1 -v -timeout 10m github.com/scaleway/scaleway-csi/test/sanity
 
 .PHONY: fmt
 fmt:

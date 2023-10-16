@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"encoding/json"
 	"fmt"
 	"runtime"
 )
@@ -35,14 +34,4 @@ func GetVersion() VersionInfo {
 		Compiler:      runtime.Compiler,
 		Platform:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 	}
-}
-
-// GetVersionJSON returns the current running version in JSON
-func GetVersionJSON() (string, error) {
-	info := GetVersion()
-	marshalled, err := json.MarshalIndent(&info, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	return string(marshalled), nil
 }

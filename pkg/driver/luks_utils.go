@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var (
+const (
 	cryptsetupCmd     = "cryptsetup"
 	defaultLuksHash   = "sha256"
 	defaultLuksCipher = "aes-xts-plain64"
@@ -29,7 +29,11 @@ func luksFormat(devicePath string, passphrase string) error {
 	luksFormatCmd := exec.Command(cryptsetupCmd, args...)
 	luksFormatCmd.Stdin = strings.NewReader(passphrase)
 
-	return luksFormatCmd.Run()
+	if err := luksFormatCmd.Run(); err != nil {
+		return fmt.Errorf("luksFormat failed: %w", err)
+	}
+
+	return nil
 }
 
 func luksOpen(devicePath string, mapperFile string, passphrase string) error {
@@ -43,7 +47,11 @@ func luksOpen(devicePath string, mapperFile string, passphrase string) error {
 	luksOpenCmd := exec.Command(cryptsetupCmd, args...)
 	luksOpenCmd.Stdin = strings.NewReader(passphrase)
 
-	return luksOpenCmd.Run()
+	if err := luksOpenCmd.Run(); err != nil {
+		return fmt.Errorf("luksOpen failed: %w", err)
+	}
+
+	return nil
 }
 
 func luksClose(mapperFile string) error {
@@ -54,7 +62,11 @@ func luksClose(mapperFile string) error {
 
 	luksCloseCmd := exec.Command(cryptsetupCmd, args...)
 
-	return luksCloseCmd.Run()
+	if err := luksCloseCmd.Run(); err != nil {
+		return fmt.Errorf("luksClose failed: %w", err)
+	}
+
+	return nil
 }
 
 func luksResize(mapperFile, passphrase string) error {
@@ -73,7 +85,7 @@ func luksResize(mapperFile, passphrase string) error {
 	luksResizeCmd.Stderr = e
 
 	if err := luksResizeCmd.Run(); err != nil {
-		return fmt.Errorf("luks resize failed: %v, stdout: %s, stderr: %s", err, o.String(), e.String())
+		return fmt.Errorf("luks resize failed: %s, stdout: %s, stderr: %s", err, o.String(), e.String())
 	}
 	return nil
 }
@@ -89,9 +101,8 @@ func luksStatus(mapperFile string) ([]byte, error) {
 	luksStatusCmd := exec.Command(cryptsetupCmd, args...)
 	luksStatusCmd.Stdout = &stdout
 
-	err := luksStatusCmd.Run()
-	if err != nil {
-		return nil, err
+	if err := luksStatusCmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to get luks status: %w", err)
 	}
 
 	return stdout.Bytes(), nil
@@ -105,15 +116,15 @@ func luksIsLuks(devicePath string) (bool, error) {
 
 	luksIsLuksCmd := exec.Command(cryptsetupCmd, args...)
 
-	err := luksIsLuksCmd.Run()
-	if err != nil {
+	if err := luksIsLuksCmd.Run(); err != nil {
 		var exitErr *exec.ExitError
 		if ok := errors.As(err, &exitErr); ok {
 			if exitErr.ExitCode() == 1 { // not a luks device
 				return false, nil
 			}
 		}
-		return false, err
+		return false, fmt.Errorf("failed to check if device is luks: %w", err)
 	}
+
 	return true, nil
 }
