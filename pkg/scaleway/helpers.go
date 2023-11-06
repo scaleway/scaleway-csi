@@ -71,6 +71,7 @@ func min(a, b int) int {
 }
 
 // clientZones returns the zones of the region where the client is configured.
+// TODO: be able to handle multiple regions.
 func clientZones(client *scw.Client) ([]scw.Zone, error) {
 	if defaultZone, ok := client.GetDefaultZone(); ok {
 		region, err := defaultZone.Region()

@@ -2,7 +2,9 @@ package scaleway
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	block "github.com/scaleway/scaleway-sdk-go/api/block/v1alpha1"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
@@ -115,4 +117,46 @@ func (s *Scaleway) GetLegacyVolume(ctx context.Context, volumeID string, zone sc
 	}
 
 	return resp.Volume, nil
+}
+
+// MigrateLegacyVolume migrates a volume from the instance API to the SBS API.
+func (s *Scaleway) MigrateLegacyVolume(ctx context.Context, volumeID string, zone scw.Zone, dryRun bool) error {
+	plan, err := s.instance.PlanBlockMigration(&instance.PlanBlockMigrationRequest{
+		VolumeID: scw.StringPtr(volumeID),
+		Zone:     zone,
+	}, scw.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("failed to plan block migration: %w", err)
+	}
+
+	if !dryRun {
+		if err := s.instance.ApplyBlockMigration(&instance.ApplyBlockMigrationRequest{
+			VolumeID:      scw.StringPtr(volumeID),
+			ValidationKey: plan.ValidationKey,
+			Zone:          zone,
+		}, scw.WithContext(ctx)); err != nil {
+			return fmt.Errorf("failed to apply block migration: %w", err)
+		}
+
+		// Wait for volume be effectively migrated.
+		for range 60 {
+			time.Sleep(1 * time.Second)
+
+			_, err := s.block.GetVolume(&block.GetVolumeRequest{
+				VolumeID: volumeID,
+				Zone:     zone,
+			}, scw.WithContext(ctx))
+			if err == nil {
+				return nil
+			}
+
+			if !IsNotFoundError(err) {
+				return fmt.Errorf("failed to get block volume: %w", err)
+			}
+		}
+
+		return errors.New("block volume was not migrated in time")
+	}
+
+	return nil
 }

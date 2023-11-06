@@ -43,3 +43,9 @@ func IsGoneError(err error) bool {
 	var internal *scw.ResponseError
 	return errors.As(err, &internal) && internal.StatusCode == http.StatusGone
 }
+
+// IsTooManyRequestsError returns true if an error is a 429 error.
+func IsTooManyRequestsError(err error) bool {
+	var respErr *scw.ResponseError
+	return errors.As(err, &respErr) && respErr.StatusCode == http.StatusTooManyRequests
+}
