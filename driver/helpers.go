@@ -11,7 +11,6 @@ import (
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog/v2"
 )
 
 func getSnapshotIDAndZone(id string) (string, scw.Zone, error) {
@@ -180,7 +179,7 @@ func getVolumeRequestCapacity(minSize int64, maxSize int64, capacityRange *csi.C
 	}
 
 	if requiredBytesSet && !limitBytesSet && requiredBytes < minSize {
-		return 0, errRequiredBytesLessThanMinimun
+		return 0, errRequiredBytesLessThanMinimum
 	}
 
 	if limitBytesSet && limitBytes < minSize {
@@ -188,7 +187,7 @@ func getVolumeRequestCapacity(minSize int64, maxSize int64, capacityRange *csi.C
 	}
 
 	if requiredBytesSet && requiredBytes > maxSize {
-		return 0, errRequiredBytesGreaterThanMaximun
+		return 0, errRequiredBytesGreaterThanMaximum
 	}
 
 	if !requiredBytesSet && limitBytesSet && limitBytes > maxSize {

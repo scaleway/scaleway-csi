@@ -583,7 +583,7 @@ func Test_getVolumeRequestCapacity(t *testing.T) {
 				LimitBytes:    0,
 			},
 			res: 0,
-			err: errRequiredBytesLessThanMinimun,
+			err: errRequiredBytesLessThanMinimum,
 		},
 		{
 			capRange: &csi.CapacityRange{
@@ -615,7 +615,7 @@ func Test_getVolumeRequestCapacity(t *testing.T) {
 				LimitBytes:    0,
 			},
 			res: 0,
-			err: errRequiredBytesGreaterThanMaximun,
+			err: errRequiredBytesGreaterThanMaximum,
 		},
 		{
 			capRange: &csi.CapacityRange{
