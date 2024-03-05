@@ -17,7 +17,7 @@ import (
 
 const (
 	diskByIDPath         = "/dev/disk/by-id"
-	diskSCWPrefix        = "scsi-0SCW_b_ssd_volume-"
+	diskSCWPrefix        = "scsi-0SCW_sbs_volume-"
 	diskLuksMapperPrefix = "scw-luks-"
 	diskLuksMapperPath   = "/dev/mapper/"
 
