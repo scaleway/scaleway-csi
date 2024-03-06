@@ -16,8 +16,10 @@ import (
 )
 
 const (
-	diskByIDPath         = "/dev/disk/by-id"
-	diskSCWPrefix        = "scsi-0SCW_b_ssd_volume-"
+	diskByIDPath = "/dev/disk/by-id"
+	// TODO(nox): DEPRECATION B_SSD - remove legacy format when legacy volumes are fully phased out.
+	legacyDiskSCWPrefix  = "scsi-0SCW_b_ssd_volume-"
+	diskSCWPrefix        = "scsi-0SCW_sbs_volume-"
 	diskLuksMapperPrefix = "scw-luks-"
 	diskLuksMapperPath   = "/dev/mapper/"
 
@@ -78,6 +80,13 @@ func newDiskUtils() *diskUtils {
 
 func devicePath(volumeID string) string {
 	return path.Join(diskByIDPath, diskSCWPrefix+volumeID)
+}
+
+// legacyDevicePath returns the legacy b_ssd volume path
+//
+// TODO(nox): DEPRECATION B_SSD - remove legacy mode when legacy volumes are fully phased out.
+func legacyDevicePath(volumeID string) string {
+	return path.Join(diskByIDPath, legacyDiskSCWPrefix+volumeID)
 }
 
 // EncryptAndOpenDevice encrypts the volume with the given ID with the given passphrase and opens it
@@ -211,6 +220,11 @@ func (d *diskUtils) MountToTarget(sourcePath, targetPath, fsType string, mountOp
 func (d *diskUtils) GetDevicePath(volumeID string) (string, error) {
 	devicePath := devicePath(volumeID)
 	realDevicePath, err := filepath.EvalSymlinks(devicePath)
+	// TODO(nox): DEPRECATION B_SSD - remove legacy fallback when legacy volumes are fully phased out.
+	if err != nil && errors.Is(err, fs.ErrNotExist) {
+		devicePath = legacyDevicePath(volumeID)
+		realDevicePath, err = filepath.EvalSymlinks(devicePath)
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to get real device path: %w", err)
 	}
