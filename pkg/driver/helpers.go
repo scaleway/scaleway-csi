@@ -312,7 +312,7 @@ func (d *controllerService) getOrCreateVolume(ctx context.Context, name, snapsho
 }
 
 // getOrCreateSnapshot gets a snapshot by name or creates it if it does not exist.
-func (d *controllerService) getOrCreateSnapshot(ctx context.Context, name, sourceVolumeID string, zone scw.Zone) (*block.SnapshotSummary, error) {
+func (d *controllerService) getOrCreateSnapshot(ctx context.Context, name, sourceVolumeID string, zone scw.Zone) (*block.Snapshot, error) {
 	snapshot, err := d.scaleway.GetSnapshotByName(ctx, name, sourceVolumeID, zone)
 	if err != nil && !errors.Is(err, scaleway.ErrSnapshotNotFound) {
 		return nil, fmt.Errorf("failed to try to get existing snapshot: %w", err)
@@ -424,8 +424,8 @@ func publishedNodeIDs(volume *block.Volume) []string {
 	return ids
 }
 
-// csiSnapshot returns a CSI Snapshot from a SnapshotSummary.
-func csiSnapshot(snapshot *block.SnapshotSummary) *csi.Snapshot {
+// csiSnapshot returns a CSI Snapshot from a Snapshot.
+func csiSnapshot(snapshot *block.Snapshot) *csi.Snapshot {
 	snap := &csi.Snapshot{
 		SizeBytes:  int64(snapshot.Size),
 		SnapshotId: expandZonalID(snapshot.ID, snapshot.Zone),

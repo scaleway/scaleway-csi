@@ -18,7 +18,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/sftp"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
-	"github.com/scaleway/scaleway-sdk-go/api/marketplace/v1"
+	"github.com/scaleway/scaleway-sdk-go/api/marketplace/v2"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"golang.org/x/crypto/ssh"
 )
@@ -33,7 +33,7 @@ const (
 var _ = Describe("Sanity", func() {
 	It("should run sanity test successfully", func(ctx SpecContext) {
 		By("Creating instance")
-		imageID, err := marketplaceAPI.GetLocalImageIDByLabel(&marketplace.GetLocalImageIDByLabelRequest{
+		image, err := marketplaceAPI.GetLocalImageByLabel(&marketplace.GetLocalImageByLabelRequest{
 			ImageLabel:     "ubuntu_jammy",
 			CommercialType: instanceCommercialType,
 		}, scw.WithContext(ctx))
@@ -42,7 +42,7 @@ var _ = Describe("Sanity", func() {
 		server, err := instanceAPI.CreateServer(&instance.CreateServerRequest{
 			Name:              "csi-sanity",
 			DynamicIPRequired: scw.BoolPtr(true),
-			Image:             imageID,
+			Image:             image.ID,
 			CommercialType:    instanceCommercialType,
 			RoutedIPEnabled:   scw.BoolPtr(true),
 			Tags:              []string{"AUTHORIZED_KEY=" + strings.ReplaceAll(sshPublicKey, " ", "_")},

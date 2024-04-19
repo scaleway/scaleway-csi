@@ -123,7 +123,7 @@ func (f *Fake) AttachVolume(ctx context.Context, serverID string, volumeID strin
 	return nil
 }
 
-func (f *Fake) CreateSnapshot(ctx context.Context, name string, volumeID string, zone scw.Zone) (*block.SnapshotSummary, error) {
+func (f *Fake) CreateSnapshot(ctx context.Context, name string, volumeID string, zone scw.Zone) (*block.Snapshot, error) {
 	f.mux.Lock()
 	defer f.mux.Unlock()
 
@@ -153,7 +153,7 @@ func (f *Fake) CreateSnapshot(ctx context.Context, name string, volumeID string,
 
 	f.snapshots[snapshot.ID] = snapshot
 
-	return snapshotToSnapshotSummary(snapshot), nil
+	return snapshot, nil
 }
 
 func (f *Fake) CreateVolume(ctx context.Context, name string, snapshotID string, size int64, perfIOPS *uint32, zone scw.Zone) (*block.Volume, error) {
@@ -278,7 +278,7 @@ func (f *Fake) GetServer(ctx context.Context, serverID string, zone scw.Zone) (*
 	return nil, &scw.ResourceNotFoundError{Resource: serverResource, ResourceID: serverID}
 }
 
-func (f *Fake) GetSnapshot(ctx context.Context, snapshotID string, zone scw.Zone) (*block.SnapshotSummary, error) {
+func (f *Fake) GetSnapshot(ctx context.Context, snapshotID string, zone scw.Zone) (*block.Snapshot, error) {
 	f.mux.Lock()
 	defer f.mux.Unlock()
 
@@ -287,13 +287,13 @@ func (f *Fake) GetSnapshot(ctx context.Context, snapshotID string, zone scw.Zone
 	}
 
 	if s, ok := f.snapshots[snapshotID]; ok && s.Zone == zone {
-		return snapshotToSnapshotSummary(f.snapshots[snapshotID]), nil
+		return s, nil
 	}
 
 	return nil, &scw.ResourceNotFoundError{Resource: snapshotResource, ResourceID: snapshotID}
 }
 
-func (f *Fake) GetSnapshotByName(ctx context.Context, name string, sourceVolumeID string, zone scw.Zone) (*block.SnapshotSummary, error) {
+func (f *Fake) GetSnapshotByName(ctx context.Context, name string, sourceVolumeID string, zone scw.Zone) (*block.Snapshot, error) {
 	f.mux.Lock()
 	defer f.mux.Unlock()
 
@@ -307,7 +307,7 @@ func (f *Fake) GetSnapshotByName(ctx context.Context, name string, sourceVolumeI
 				return nil, ErrSnapshotExists
 			}
 
-			return snapshotToSnapshotSummary(s), nil
+			return s, nil
 		}
 	}
 
@@ -350,21 +350,16 @@ func (f *Fake) GetVolumeByName(ctx context.Context, name string, size scw.Size, 
 	return nil, ErrVolumeNotFound
 }
 
-func (f *Fake) ListSnapshots(ctx context.Context, start uint32, max uint32) ([]*block.SnapshotSummary, string, error) {
+func (f *Fake) ListSnapshots(ctx context.Context, start uint32, max uint32) ([]*block.Snapshot, string, error) {
 	f.mux.Lock()
 	defer f.mux.Unlock()
 
 	results, next := mapPaginatedRange(f.snapshots, func(_ *block.Snapshot) bool { return true }, start, max)
 
-	snapshots := make([]*block.SnapshotSummary, 0, len(results))
-	for _, r := range results {
-		snapshots = append(snapshots, snapshotToSnapshotSummary(r))
-	}
-
-	return snapshots, next, nil
+	return results, next, nil
 }
 
-func (f *Fake) ListSnapshotsBySourceVolume(ctx context.Context, start uint32, max uint32, sourceVolumeID string, sourceVolumeZone scw.Zone) ([]*block.SnapshotSummary, string, error) {
+func (f *Fake) ListSnapshotsBySourceVolume(ctx context.Context, start uint32, max uint32, sourceVolumeID string, sourceVolumeZone scw.Zone) ([]*block.Snapshot, string, error) {
 	f.mux.Lock()
 	defer f.mux.Unlock()
 
@@ -372,12 +367,7 @@ func (f *Fake) ListSnapshotsBySourceVolume(ctx context.Context, start uint32, ma
 		return s.ParentVolume != nil && s.ParentVolume.ID == sourceVolumeID && s.Zone == sourceVolumeZone
 	}, start, max)
 
-	snapshots := make([]*block.SnapshotSummary, 0, len(results))
-	for _, r := range results {
-		snapshots = append(snapshots, snapshotToSnapshotSummary(r))
-	}
-
-	return snapshots, next, nil
+	return results, next, nil
 }
 
 func (f *Fake) ListVolumes(ctx context.Context, start uint32, max uint32) ([]*block.Volume, string, error) {
@@ -410,6 +400,6 @@ func (f *Fake) ResizeVolume(ctx context.Context, volumeID string, zone scw.Zone,
 	return &scw.ResourceNotFoundError{Resource: volumeResource, ResourceID: volumeID}
 }
 
-func (f *Fake) WaitForSnapshot(ctx context.Context, snapshotID string, zone scw.Zone) (*block.SnapshotSummary, error) {
+func (f *Fake) WaitForSnapshot(ctx context.Context, snapshotID string, zone scw.Zone) (*block.Snapshot, error) {
 	return f.GetSnapshot(ctx, snapshotID, zone)
 }

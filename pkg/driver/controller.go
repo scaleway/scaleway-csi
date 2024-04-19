@@ -426,7 +426,7 @@ func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		return nil, status.Errorf(codes.Aborted, "invalid startingToken: %s", err)
 	}
 
-	var snapshots []*block.SnapshotSummary
+	var snapshots []*block.Snapshot
 	var next string
 
 	switch {
@@ -547,4 +547,9 @@ func (d *controllerService) ControllerGetVolume(ctx context.Context, req *csi.Co
 			PublishedNodeIds: publishedNodeIDs(volume),
 		},
 	}, nil
+}
+
+// ControllerModifyVolume is not supported yet.
+func (d *controllerService) ControllerModifyVolume(context.Context, *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ControllerModifyVolume not implemented")
 }
