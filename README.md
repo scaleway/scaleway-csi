@@ -6,15 +6,11 @@
 > You are currently on a branch which corresponds to the `v0.3` release of the Scaleway CSI.
 >
 > This release is **NOT** compatible with the `v0.2` and `v0.1` releases as it introduces
-> a major **breaking change**: it now uses the **new Scaleway Block Storage (SBS) API** (which
-> is still in private beta) instead of the Instance API to manage block volumes and
+> a major **breaking change**: it now uses the **new Scaleway Block Storage (SBS) API** instead of the Instance API to manage block volumes and
 > snapshots.
 >
-> - If you are currently using the `v0.2.x` or `v0.1.x` versions of the Scaleway CSI:
+> If you are currently using the `v0.2.x` or `v0.1.x` versions of the Scaleway CSI:
 >   please do not use this release until we provide a tool to migrate from `v0.2` to the `v0.3` release.
-> - If you are looking to install the CSI for the first time using the `v0.3` release:
->   make sure you have access to the new Scaleway Block Storage API. You can request
->   access [here](https://www.scaleway.com/en/betas/#block-storage-low-latency).
 >
 > Not sure what to do?
 >
