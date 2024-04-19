@@ -37,7 +37,7 @@ func (s *Scaleway) GetVolumeByName(ctx context.Context, name string, size scw.Si
 }
 
 // GetSnapshotByName is a helper to find a snapshot by its name, its sourceVolumeID and zone.
-func (s *Scaleway) GetSnapshotByName(ctx context.Context, name string, sourceVolumeID string, zone scw.Zone) (*block.SnapshotSummary, error) {
+func (s *Scaleway) GetSnapshotByName(ctx context.Context, name string, sourceVolumeID string, zone scw.Zone) (*block.Snapshot, error) {
 	snapshotsResp, err := s.block.ListSnapshots(&block.ListSnapshotsRequest{
 		Name: scw.StringPtr(name),
 		Zone: zone,
@@ -77,8 +77,8 @@ func (s *Scaleway) ListVolumes(ctx context.Context, start, max uint32) ([]*block
 
 // ListVolumes lists all snapshots in all zones of the region where the driver is
 // deployed. Results are paginated, use the returned token to fetch the next results.
-func (s *Scaleway) ListSnapshots(ctx context.Context, start, max uint32) ([]*block.SnapshotSummary, string, error) {
-	return paginatedList(func(page int32, pageSize uint32) ([]*block.SnapshotSummary, error) {
+func (s *Scaleway) ListSnapshots(ctx context.Context, start, max uint32) ([]*block.Snapshot, string, error) {
+	return paginatedList(func(page int32, pageSize uint32) ([]*block.Snapshot, error) {
 		snapshotsResp, err := s.block.ListSnapshots(&block.ListSnapshotsRequest{
 			Page:     scw.Int32Ptr(page),
 			PageSize: scw.Uint32Ptr(pageSize),
@@ -100,13 +100,13 @@ func (s *Scaleway) ListSnapshotsBySourceVolume(
 	start, max uint32,
 	sourceVolumeID string,
 	sourceVolumeZone scw.Zone,
-) ([]*block.SnapshotSummary, string, error) {
+) ([]*block.Snapshot, string, error) {
 	// Return nothing if sourceVolumeID is not a valid UUID.
 	if !isValidUUID(sourceVolumeID) {
 		return nil, "", nil
 	}
 
-	return paginatedList(func(page int32, pageSize uint32) ([]*block.SnapshotSummary, error) {
+	return paginatedList(func(page int32, pageSize uint32) ([]*block.Snapshot, error) {
 		snapshotsResp, err := s.block.ListSnapshots(&block.ListSnapshotsRequest{
 			Page:     scw.Int32Ptr(page),
 			PageSize: scw.Uint32Ptr(pageSize),
@@ -174,7 +174,7 @@ func (s *Scaleway) DeleteSnapshot(ctx context.Context, snapshotID string, zone s
 }
 
 // GetSnapshot returns the snapshot that has the provided ID and zone.
-func (s *Scaleway) GetSnapshot(ctx context.Context, snapshotID string, zone scw.Zone) (*block.SnapshotSummary, error) {
+func (s *Scaleway) GetSnapshot(ctx context.Context, snapshotID string, zone scw.Zone) (*block.Snapshot, error) {
 	// Return not found if snapshotID is not a valid UUID.
 	if !isValidUUID(snapshotID) {
 		return nil, &scw.ResourceNotFoundError{Resource: snapshotResource, ResourceID: snapshotID}
@@ -188,7 +188,7 @@ func (s *Scaleway) GetSnapshot(ctx context.Context, snapshotID string, zone scw.
 		return nil, fmt.Errorf("failed to get snapshot: %w", err)
 	}
 
-	return snapshotToSnapshotSummary(snapshot), nil
+	return snapshot, nil
 }
 
 // ResizeVolume updates the size of a volume. It waits until the volume is successfully
@@ -252,11 +252,23 @@ func (s *Scaleway) CreateVolume(ctx context.Context, name, snapshotID string, si
 		return nil, fmt.Errorf("failed to create volume: %w", err)
 	}
 
+	vol, err := s.block.WaitForVolume(&block.WaitForVolumeRequest{
+		VolumeID: volume.ID,
+		Zone:     zone,
+	}, scw.WithContext(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("wait for volume ended with an error: %w", err)
+	}
+
+	if vol.Status != block.VolumeStatusAvailable {
+		return nil, fmt.Errorf("volume %s is in state %s", volume.ID, vol.Status)
+	}
+
 	return volume, nil
 }
 
 // CreateSnapshot creates a snapshot with the given parameters.
-func (s *Scaleway) CreateSnapshot(ctx context.Context, name, volumeID string, zone scw.Zone) (*block.SnapshotSummary, error) {
+func (s *Scaleway) CreateSnapshot(ctx context.Context, name, volumeID string, zone scw.Zone) (*block.Snapshot, error) {
 	// Return not found if volumeID is not a valid UUID.
 	if !isValidUUID(volumeID) {
 		return nil, &scw.ResourceNotFoundError{Resource: volumeResource, ResourceID: volumeID}
@@ -271,11 +283,11 @@ func (s *Scaleway) CreateSnapshot(ctx context.Context, name, volumeID string, zo
 		return nil, fmt.Errorf("failed to create snapshot: %w", err)
 	}
 
-	return snapshotToSnapshotSummary(snapshot), nil
+	return snapshot, nil
 }
 
 // WaitForSnapshot waits for a snapshot to be in a terminal state.
-func (s *Scaleway) WaitForSnapshot(ctx context.Context, snapshotID string, zone scw.Zone) (*block.SnapshotSummary, error) {
+func (s *Scaleway) WaitForSnapshot(ctx context.Context, snapshotID string, zone scw.Zone) (*block.Snapshot, error) {
 	// Return not found if volumeID is not a valid UUID.
 	if !isValidUUID(snapshotID) {
 		return nil, &scw.ResourceNotFoundError{Resource: snapshotResource, ResourceID: snapshotID}
@@ -289,5 +301,5 @@ func (s *Scaleway) WaitForSnapshot(ctx context.Context, snapshotID string, zone 
 		return nil, fmt.Errorf("wait for snapshot error: %w", err)
 	}
 
-	return snapshotToSnapshotSummary(snap), nil
+	return snap, nil
 }

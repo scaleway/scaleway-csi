@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
-	block "github.com/scaleway/scaleway-sdk-go/api/block/v1alpha1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 )
 
@@ -93,23 +92,6 @@ func clientZones(client *scw.Client) ([]scw.Zone, error) {
 	}
 
 	return nil, fmt.Errorf("no zone/region was provided, please set the SCW_DEFAULT_ZONE environment variable")
-}
-
-// snapshotToSnapshotSummary converts a Snapshot to a SnapshotSummary.
-func snapshotToSnapshotSummary(snapshot *block.Snapshot) *block.SnapshotSummary {
-	return &block.SnapshotSummary{
-		ID:           snapshot.ID,
-		Name:         snapshot.Name,
-		ParentVolume: snapshot.ParentVolume,
-		Size:         snapshot.Size,
-		ProjectID:    snapshot.ProjectID,
-		CreatedAt:    snapshot.CreatedAt,
-		UpdatedAt:    snapshot.UpdatedAt,
-		Status:       snapshot.Status,
-		Tags:         snapshot.Tags,
-		Zone:         snapshot.Zone,
-		Class:        snapshot.Class,
-	}
 }
 
 // isValidUUID returns true if the provided value is a valid UUID.
