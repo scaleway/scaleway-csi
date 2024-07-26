@@ -49,3 +49,9 @@ func IsTooManyRequestsError(err error) bool {
 	var respErr *scw.ResponseError
 	return errors.As(err, &respErr) && respErr.StatusCode == http.StatusTooManyRequests
 }
+
+// IsInternalServerError returns true if an error is a 500 error.
+func IsInternalServerError(err error) bool {
+	var respErr *scw.ResponseError
+	return errors.As(err, &respErr) && respErr.StatusCode == http.StatusInternalServerError
+}

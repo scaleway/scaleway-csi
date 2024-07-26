@@ -3,27 +3,26 @@ package main
 import (
 	"context"
 	"flag"
-	"path/filepath"
 
 	"github.com/scaleway/scaleway-csi/pkg/driver"
 	"github.com/scaleway/scaleway-csi/pkg/migration"
 	"github.com/scaleway/scaleway-csi/pkg/scaleway"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	"k8s.io/klog/v2"
 )
 
 func main() {
-	ctx := context.Background()
+	var (
+		ctx = context.Background()
 
-	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
-	dryRun := flag.Bool("dry-run", false, "When set to true, volumes and snapshots will not be migrated")
+		// Flags
+		kubeconfig               = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		disableVolumeMigration   = flag.Bool("disable-volume-migration", false, "Disables listing volumes and migrating them")
+		disableSnapshotMigration = flag.Bool("disable-snapshot-migration", false, "Disables listing snapshots and migrating them")
+		dryRun                   = flag.Bool("dry-run", false, "Simulates the volume and snapshot migration process")
+	)
 	flag.Parse()
 
 	// Create Kubernetes client.
@@ -37,6 +36,11 @@ func main() {
 		klog.Fatal(err)
 	}
 
+	dynClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		klog.Fatal(err)
+	}
+
 	// Create Scaleway client.
 	scw, err := scaleway.New(driver.UserAgent())
 	if err != nil {
@@ -44,7 +48,13 @@ func main() {
 	}
 
 	// Migrate volumes and snapshots from Instance to Block API.
-	if err := migration.New(clientset, scw, *dryRun).Do(ctx); err != nil {
+	opts := &migration.Options{
+		DryRun:                   *dryRun,
+		DisableVolumeMigration:   *disableVolumeMigration,
+		DisableSnapshotMigration: *disableSnapshotMigration,
+	}
+
+	if err := migration.New(clientset, dynClient, scw, opts).Do(ctx); err != nil {
 		klog.Fatal(err)
 	}
 }
