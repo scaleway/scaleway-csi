@@ -3,7 +3,6 @@ package driver
 import (
 	"context"
 	"strconv"
-	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/scaleway/scaleway-csi/pkg/scaleway"
@@ -61,8 +60,6 @@ var _ csi.ControllerServer = &controllerService{}
 type controllerService struct {
 	scaleway scaleway.Interface
 	config   *DriverConfig
-	// Global attach/detach mutex.
-	mux sync.Mutex
 	// Volume locks ensures we don't run parallel operations on volumes (e.g.
 	// detaching a volume and taking a snapshot).
 	locks namedlocker.Store
@@ -220,8 +217,6 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 		return nil, status.Errorf(codes.ResourceExhausted, "max number of volumes reached for instance %s", nodeID)
 	}
 
-	d.mux.Lock()
-	defer d.mux.Unlock()
 	if err := d.scaleway.AttachVolume(ctx, nodeID, volumeID, volumeZone); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to attach volume to instance: %s", err)
 	}
@@ -273,8 +268,6 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 		return nil, status.Errorf(code, "failed to get server where to unpublish volume: %s", err)
 	}
 
-	d.mux.Lock()
-	defer d.mux.Unlock()
 	if err := d.scaleway.DetachVolume(ctx, volumeID, volumeZone); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to detach volume: %s", err)
 	}
