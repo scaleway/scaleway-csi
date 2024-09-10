@@ -1,6 +1,6 @@
 # Scaleway Block Volume CSI driver
 
-> **Important**
+> [!CAUTION]
 > ⚠️ **Please read this first before doing anything else!** ⚠️
 >
 > You are currently on a branch which corresponds to the `v0.3` release of the Scaleway CSI.
@@ -10,14 +10,8 @@
 > snapshots.
 >
 > If you are currently using the `v0.2.x` or `v0.1.x` versions of the Scaleway CSI:
->   please do not use this release until we provide a tool to migrate from `v0.2` to the `v0.3` release.
->
-> Not sure what to do?
->
-> ➡️ Use the [release-0.2](https://github.com/scaleway/scaleway-csi/tree/release-0.2)
-> branch for now.
->
-> ➡️ Reach us on the *#k8s* channel on the [Scaleway Slack community](https://www.scaleway.com/en/docs/tutorials/scaleway-slack-community/).
+> please make sure you migrate your volumes using the [sbs-migration](./cmd/sbs-migration/)
+> tool. Your volumes will automatically be migrated if you use the Helm Chart.
 
 The [Scaleway Block Volume](https://www.scaleway.com/en/block-storage/)
 Container Storage Interface (CSI) driver is an implementation of the
@@ -44,10 +38,10 @@ A Block Volume or Snapshot currently managed by the *Instance API* **cannot** be
 *Scaleway Block Storage API* and vice versa.
 
 In the future, all Block Volumes and Snapshots will be managed by the *Scaleway Block Storage API*.
-In order to use newer versions of the CSI (v0.3+), it is needed to migrate Block Volumes and Snapshots
-from the *Instance API* to the *Scaleway Block Storage API* (currently not possible).
 
-A tool will be made available later to facilitate upgrades from older CSI releases to v0.3+.
+In order to use newer versions of the CSI (v0.3+), it is needed to migrate Block Volumes and Snapshots
+from the *Instance API* to the *Scaleway Block Storage API* using the [sbs-migration](./cmd/sbs-migration/) tool.
+Your volumes will automatically be migrated if you use the Helm Chart.
 
 | Scaleway CSI Driver \ Scaleway Storage API compatibility | Instance API | Scaleway Block Storage API |
 | -------------------------------------------------------- | ------------ | -------------------------- |
