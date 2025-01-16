@@ -160,12 +160,6 @@ func (s *fakeHelper) CreateVolume(req *instance.CreateVolumeRequest, opts ...scw
 	volume.VolumeType = req.VolumeType
 	if req.Size != nil {
 		volume.Size = *req.Size
-	} else if req.BaseVolume != nil {
-		baseVol, ok := s.volumesMap[*req.BaseVolume]
-		if !ok {
-			return nil, &scw.ResourceNotFoundError{}
-		}
-		volume.Size = baseVol.Size
 	} else if req.BaseSnapshot != nil {
 		baseSnap, ok := s.snapshotsMap[*req.BaseSnapshot]
 		if !ok {
