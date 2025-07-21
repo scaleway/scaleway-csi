@@ -2,9 +2,7 @@ package scaleway
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
 	block "github.com/scaleway/scaleway-sdk-go/api/block/v1alpha1"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
@@ -101,113 +99,6 @@ func (s *Scaleway) waitForVolumeAndReferences(
 		if ref.Status != referenceStatus {
 			return fmt.Errorf("volume reference %s is in state %s which is not expected", ref.ID, ref.Status)
 		}
-	}
-
-	return nil
-}
-
-// GetLegacyVolume gets an Instance volume by its ID and zone.
-func (s *Scaleway) GetLegacyVolume(ctx context.Context, volumeID string, zone scw.Zone) (*instance.Volume, error) {
-	resp, err := s.instance.GetVolume(&instance.GetVolumeRequest{
-		VolumeID: volumeID,
-		Zone:     zone,
-	}, scw.WithContext(ctx))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get legacy volume: %w", err)
-	}
-
-	return resp.Volume, nil
-}
-
-// GetLegacySnapshot gets an Instance snapshot by its ID and zone.
-func (s *Scaleway) GetLegacySnapshot(ctx context.Context, snapshotID string, zone scw.Zone) (*instance.Snapshot, error) {
-	resp, err := s.instance.GetSnapshot(&instance.GetSnapshotRequest{
-		SnapshotID: snapshotID,
-		Zone:       zone,
-	}, scw.WithContext(ctx))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get legacy snapshot: %w", err)
-	}
-
-	return resp.Snapshot, nil
-}
-
-// MigrateLegacyVolume migrates a volume from the instance API to the SBS API.
-func (s *Scaleway) MigrateLegacyVolume(ctx context.Context, volumeID string, zone scw.Zone, dryRun bool) error {
-	return s.migrateBlock(ctx, &instance.PlanBlockMigrationRequest{
-		Zone:     zone,
-		VolumeID: scw.StringPtr(volumeID),
-	}, &instance.ApplyBlockMigrationRequest{
-		Zone:     zone,
-		VolumeID: scw.StringPtr(volumeID),
-	}, func(ctx context.Context) error {
-		if _, err := s.block.GetVolume(&block.GetVolumeRequest{
-			VolumeID: volumeID,
-			Zone:     zone,
-		}, scw.WithContext(ctx)); err != nil {
-			return fmt.Errorf("failed to get volume: %w", err)
-		}
-
-		return nil
-	}, dryRun)
-}
-
-// MigrateLegacySnapshot migrates a snapshot from the instance API to the SBS API.
-func (s *Scaleway) MigrateLegacySnapshot(ctx context.Context, snapshotID string, zone scw.Zone, dryRun bool) error {
-	return s.migrateBlock(ctx, &instance.PlanBlockMigrationRequest{
-		Zone:       zone,
-		SnapshotID: scw.StringPtr(snapshotID),
-	}, &instance.ApplyBlockMigrationRequest{
-		Zone:       zone,
-		SnapshotID: scw.StringPtr(snapshotID),
-	}, func(ctx context.Context) error {
-		if _, err := s.block.GetSnapshot(&block.GetSnapshotRequest{
-			SnapshotID: snapshotID,
-			Zone:       zone,
-		}, scw.WithContext(ctx)); err != nil {
-			return fmt.Errorf("failed to get snapshot: %w", err)
-		}
-
-		return nil
-	}, dryRun)
-}
-
-func (s *Scaleway) migrateBlock(
-	ctx context.Context,
-	planReq *instance.PlanBlockMigrationRequest,
-	applyReq *instance.ApplyBlockMigrationRequest,
-	getter func(ctx context.Context) error,
-	dryRun bool,
-) error {
-	plan, err := s.instance.PlanBlockMigration(planReq, scw.WithContext(ctx))
-	if err != nil {
-		return fmt.Errorf("failed to plan block migration: %w", err)
-	}
-
-	if !dryRun {
-		applyReq.ValidationKey = plan.ValidationKey
-
-		// ApplyBlockMigration sometimes return a 500 error due to a serialization error,
-		// caller should simply retry.
-		if err := s.instance.ApplyBlockMigration(applyReq, scw.WithContext(ctx)); err != nil {
-			return fmt.Errorf("failed to apply block migration: %w", err)
-		}
-
-		// Wait for block to be effectively migrated.
-		for range 60 {
-			time.Sleep(1 * time.Second)
-
-			err = getter(ctx)
-			if err == nil {
-				return nil
-			}
-
-			if !IsNotFoundError(err) {
-				return err
-			}
-		}
-
-		return errors.New("block was not migrated in time")
 	}
 
 	return nil

@@ -15,11 +15,9 @@ ARG TAG
 ARG COMMIT_SHA
 ARG BUILD_DATE
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -ldflags "-w -s -X github.com/scaleway/scaleway-csi/driver.driverVersion=${TAG} -X github.com/scaleway/scaleway-csi/driver.buildDate=${BUILD_DATE} -X github.com/scaleway/scaleway-csi/driver.gitCommit=${COMMIT_SHA} " -o scaleway-csi ./cmd/scaleway-csi
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -ldflags "-w -s -X github.com/scaleway/scaleway-csi/driver.driverVersion=${TAG} -X github.com/scaleway/scaleway-csi/driver.buildDate=${BUILD_DATE} -X github.com/scaleway/scaleway-csi/driver.gitCommit=${COMMIT_SHA} " -o sbs-migration ./cmd/sbs-migration
 
 FROM alpine:3.15
 RUN apk update && apk add --no-cache e2fsprogs e2fsprogs-extra xfsprogs xfsprogs-extra cryptsetup ca-certificates blkid && update-ca-certificates
 WORKDIR /
 COPY --from=builder /go/src/github.com/scaleway/scaleway-csi/scaleway-csi .
-COPY --from=builder /go/src/github.com/scaleway/scaleway-csi/sbs-migration .
 ENTRYPOINT ["/scaleway-csi"]

@@ -1,18 +1,5 @@
 # Scaleway Block Volume CSI driver
 
-> [!CAUTION]
-> ⚠️ **Please read this first before doing anything else!** ⚠️
->
-> You are currently on a branch which corresponds to the `v0.3` release of the Scaleway CSI.
->
-> This release is **NOT** compatible with the `v0.2` and `v0.1` releases as it introduces
-> a major **breaking change**: it now uses the **new Scaleway Block Storage (SBS) API** instead of the Instance API to manage block volumes and
-> snapshots.
->
-> If you are currently using the `v0.2.x` or `v0.1.x` versions of the Scaleway CSI:
-> please make sure you migrate your volumes using the [sbs-migration](./cmd/sbs-migration/)
-> tool. Your volumes will automatically be migrated if you use the Helm Chart.
-
 The [Scaleway Block Volume](https://www.scaleway.com/en/block-storage/)
 Container Storage Interface (CSI) driver is an implementation of the
 [CSI interface](https://github.com/container-storage-interface/spec/blob/master/spec.md)
@@ -26,29 +13,6 @@ to provide a way to manage Scaleway Block Volumes through a container orchestrat
 | v0.1.x                            | ✅      | ❌      | ❌      |
 | v0.2.x                            | ✅      | ✅      | ❌      |
 | v0.3.x                            | ✅      | ✅      | ✅      |
-
-## Scaleway Storage API Compatibility Matrix
-
-Scaleway currently offers two APIs to manage Block Volumes and Snapshots:
-
-- [Instance API](https://www.scaleway.com/en/developers/api/instance/)
-- [Scaleway Block Storage API](https://www.scaleway.com/en/developers/api/block/)
-
-A Block Volume or Snapshot currently managed by the *Instance API* **cannot** be managed by the
-*Scaleway Block Storage API* and vice versa.
-
-In the future, all Block Volumes and Snapshots will be managed by the *Scaleway Block Storage API*.
-
-In order to use newer versions of the CSI (v0.3+), it is needed to migrate Block Volumes and Snapshots
-from the *Instance API* to the *Scaleway Block Storage API* using the [sbs-migration](./cmd/sbs-migration/) tool.
-Your volumes will automatically be migrated if you use the Helm Chart.
-
-| Scaleway CSI Driver \ Scaleway Storage API compatibility | Instance API | Scaleway Block Storage API |
-| -------------------------------------------------------- | ------------ | -------------------------- |
-| master branch                                            | ❌            | ✅                          |
-| v0.1.x                                                   | ✅            | ❌                          |
-| v0.2.x                                                   | ✅            | ❌                          |
-| v0.3.x                                                   | ❌            | ✅                          |
 
 ## Features
 
