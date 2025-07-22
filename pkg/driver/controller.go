@@ -6,7 +6,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/scaleway/scaleway-csi/pkg/scaleway"
-	block "github.com/scaleway/scaleway-sdk-go/api/block/v1alpha1"
+	block "github.com/scaleway/scaleway-sdk-go/api/block/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -54,10 +54,9 @@ var (
 )
 
 // controllerService implements csi.ControllerServer.
-var _ csi.ControllerServer = &controllerService{}
-
-// controllerService implements csi.ControllerServer.
 type controllerService struct {
+	csi.UnimplementedControllerServer
+
 	scaleway scaleway.Interface
 	config   *DriverConfig
 	// Volume locks ensures we don't run parallel operations on volumes (e.g.
@@ -80,7 +79,7 @@ func newControllerService(config *DriverConfig) (*controllerService, error) {
 // CreateVolume creates a new volume with the given CreateVolumeRequest.
 // This function is idempotent
 func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	klog.V(4).Infof("CreateVolume: called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("CreateVolume: called with %s", stripSecretFromReq(req))
 
 	volumeName := req.GetName()
 	if volumeName == "" {
@@ -143,7 +142,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 // DeleteVolume deprovisions a volume.
 // This operation MUST be idempotent.
 func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	klog.V(4).Infof("DeleteVolume called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("DeleteVolume called with %s", stripSecretFromReq(req))
 	volumeID, volumeZone, err := ExtractIDAndZone(req.GetVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid parameter volumeID: %s", err)
@@ -167,7 +166,7 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 // ControllerPublishVolume perform the work that is necessary for making the volume available on the given node.
 // This operation MUST be idempotent.
 func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	klog.V(4).Infof("ControllerPublishVolume called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("ControllerPublishVolume called with %s", stripSecretFromReq(req))
 
 	volumeID, volumeZone, err := ExtractIDAndZone(req.GetVolumeId())
 	if err != nil {
@@ -229,7 +228,7 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 // ControllerUnpublishVolume is the reverse operation of ControllerPublishVolume
 // This operation MUST be idempotent.
 func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	klog.V(4).Infof("ControllerUnpublishVolume called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("ControllerUnpublishVolume called with %s", stripSecretFromReq(req))
 
 	volumeID, volumeZone, err := ExtractIDAndZone(req.GetVolumeId())
 	if err != nil {
@@ -280,7 +279,7 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 // volume capabilities specified in the request are supported.
 // This operation MUST be idempotent.
 func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	klog.V(4).Infof("ValidateVolumeCapabilities called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("ValidateVolumeCapabilities called with %s", stripSecretFromReq(req))
 	volumeID, volumeZone, err := ExtractIDAndZone(req.GetVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid parameter volumeID: %s", err)
@@ -303,14 +302,18 @@ func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req 
 
 // ListVolumes returns the list of the requested volumes
 func (d *controllerService) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-	klog.V(4).Infof("ListVolumes called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("ListVolumes called with %s", stripSecretFromReq(req))
 
 	start, err := parseStartingToken(req.GetStartingToken())
 	if err != nil {
 		return nil, status.Errorf(codes.Aborted, "invalid startingToken: %s", err)
 	}
 
-	volumes, next, err := d.scaleway.ListVolumes(ctx, start, uint32(req.GetMaxEntries()))
+	if req.MaxEntries < 0 {
+		return nil, status.Error(codes.InvalidArgument, "maxEntries must be a positive number")
+	}
+
+	volumes, next, err := d.scaleway.ListVolumes(ctx, start, uint32(req.MaxEntries))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list volumes: %s", err)
 	}
@@ -331,15 +334,9 @@ func (d *controllerService) ListVolumes(ctx context.Context, req *csi.ListVolume
 	}, nil
 }
 
-// GetCapacity returns the capacity of the storage pool from which the controller provisions volumes.
-func (d *controllerService) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	klog.V(4).Infof("GetCapacity is not yet implemented")
-	return nil, status.Error(codes.Unimplemented, "GetCapacity is not yet implemented")
-}
-
 // ControllerGetCapabilities returns the supported capabilities of controller service provided by the Plugin.
 func (d *controllerService) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
-	klog.V(4).Infof("ControllerGetCapabilities called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("ControllerGetCapabilities called with %s", stripSecretFromReq(req))
 
 	capabilities := make([]*csi.ControllerServiceCapability, 0, len(controllerCapabilities))
 	for _, capability := range controllerCapabilities {
@@ -357,7 +354,7 @@ func (d *controllerService) ControllerGetCapabilities(ctx context.Context, req *
 
 // CreateSnapshot creates a snapshot of the given volume
 func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	klog.V(4).Infof("CreateSnapshot called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("CreateSnapshot called with %s", stripSecretFromReq(req))
 	sourceVolumeID, sourceVolumeZone, err := ExtractIDAndZone(req.GetSourceVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid parameter sourceVolumeID: %s", err)
@@ -388,7 +385,7 @@ func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 // DeleteSnapshot deletes the given snapshot
 func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	klog.V(4).Infof("DeleteSnapshot called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("DeleteSnapshot called with %s", stripSecretFromReq(req))
 	snapshotID, snapshotZone, err := ExtractIDAndZone(req.GetSnapshotId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid parameter snapshotID: %s", err)
@@ -412,11 +409,15 @@ func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 // they were created. ListSnapshots SHALL NOT list a snapshot that
 // is being created but has not been cut successfully yet.
 func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	klog.V(4).Infof("ListSnapshots called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("ListSnapshots called with %s", stripSecretFromReq(req))
 
 	start, err := parseStartingToken(req.GetStartingToken())
 	if err != nil {
 		return nil, status.Errorf(codes.Aborted, "invalid startingToken: %s", err)
+	}
+
+	if req.MaxEntries < 0 {
+		return nil, status.Error(codes.InvalidArgument, "maxEntries must be a positive number")
 	}
 
 	var snapshots []*block.Snapshot
@@ -446,7 +447,7 @@ func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnap
 			return nil, status.Errorf(codes.InvalidArgument, "invalid parameter sourceVolumeID: %s", err)
 		}
 
-		s, n, err := d.scaleway.ListSnapshotsBySourceVolume(ctx, start, uint32(req.GetMaxEntries()), sourceVolumeID, sourceVolumeZone)
+		s, n, err := d.scaleway.ListSnapshotsBySourceVolume(ctx, start, uint32(req.MaxEntries), sourceVolumeID, sourceVolumeZone)
 		if err != nil {
 			return nil, status.Errorf(codeFromScalewayError(err), "failed to get snapshots for volume %q: %s", req.GetSourceVolumeId(), err)
 		}
@@ -454,7 +455,7 @@ func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		snapshots = append(snapshots, s...)
 		next = n
 	default:
-		s, n, err := d.scaleway.ListSnapshots(ctx, start, uint32(req.GetMaxEntries()))
+		s, n, err := d.scaleway.ListSnapshots(ctx, start, uint32(req.MaxEntries))
 		if err != nil {
 			return nil, status.Errorf(codeFromScalewayError(err), "failed to list snapshots: %s", err)
 		}
@@ -478,7 +479,7 @@ func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 // ControllerExpandVolume expands the given volume
 func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	klog.V(4).Infof("ControllerExpandVolume called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("ControllerExpandVolume called with %s", stripSecretFromReq(req))
 	volumeID, volumeZone, err := ExtractIDAndZone(req.GetVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid parameter volumeID: %s", err)
@@ -509,9 +510,9 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 		return nil, status.Errorf(codes.OutOfRange, "capacityRange invalid: %s", err)
 	}
 
-	if int64(volumeResp.Size) >= newSize {
+	if volumeSize := scwSizetoInt64(volumeResp.Size); volumeSize >= newSize {
 		// Volume is already larger than or equal to the target capacity.
-		return &csi.ControllerExpandVolumeResponse{CapacityBytes: int64(volumeResp.Size), NodeExpansionRequired: nodeExpansionRequired}, nil
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volumeSize, NodeExpansionRequired: nodeExpansionRequired}, nil
 	}
 
 	if err = d.scaleway.ResizeVolume(ctx, volumeID, volumeZone, newSize); err != nil {
@@ -523,7 +524,7 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 
 // ControllerGetVolume gets a specific volume.
 func (d *controllerService) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	klog.V(4).Infof("ControllerGetVolume called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("ControllerGetVolume called with %s", stripSecretFromReq(req))
 	volumeID, volumeZone, err := ExtractIDAndZone(req.GetVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid parameter volumeID: %s", err)

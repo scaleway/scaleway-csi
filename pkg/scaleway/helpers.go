@@ -1,6 +1,7 @@
 package scaleway
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -15,21 +16,21 @@ const maxPageSize = 50
 // paginatedList allows to list resources with a start and max pagination options.
 func paginatedList[T any](query func(page int32, pageSize uint32) ([]T, error), start, max uint32) (elements []T, next string, err error) {
 	// Reduce page size if needed.
-	listPageSize := maxPageSize
-	if int(max) < listPageSize && max != 0 {
-		listPageSize = int(max)
+	listPageSize := uint32(maxPageSize)
+	if max < listPageSize && max != 0 {
+		listPageSize = max
 	}
 
 	var (
 		// first page to query (must start at 1).
 		page = int32(math.Floor(float64(start)/float64(listPageSize))) + 1
 		// first element index.
-		first = int(start % uint32(listPageSize))
+		first = int(start % listPageSize)
 	)
 
 	for {
 		var resp []T
-		resp, err = query(page, uint32(listPageSize))
+		resp, err = query(page, listPageSize)
 		if err != nil {
 			return nil, "", err
 		}
@@ -47,7 +48,7 @@ func paginatedList[T any](query func(page int32, pageSize uint32) ([]T, error), 
 
 			// reached max elements.
 			if len(elements) >= int(max) {
-				if respCount == listPageSize {
+				if respCount == int(listPageSize) {
 					next = strconv.Itoa(int(start + max))
 				}
 
@@ -56,7 +57,7 @@ func paginatedList[T any](query func(page int32, pageSize uint32) ([]T, error), 
 		}
 
 		// less results than page size.
-		if respCount != listPageSize {
+		if respCount != int(listPageSize) {
 			return
 		}
 
@@ -99,4 +100,12 @@ func clientZones(client *scw.Client) ([]scw.Zone, error) {
 func isValidUUID(u string) bool {
 	_, err := uuid.Parse(u)
 	return err == nil
+}
+
+// NewSize creates a new scw.Size from an int64 value.
+func NewSize(size int64) (scw.Size, error) {
+	if size < 0 {
+		return 0, errors.New("size cannot be a negative number")
+	}
+	return scw.Size(size), nil
 }

@@ -53,6 +53,8 @@ type DriverConfig struct {
 
 // Driver implements the interfaces csi.IdentityServer, csi.ControllerServer and csi.NodeServer.
 type Driver struct {
+	csi.UnimplementedIdentityServer
+
 	// controllerService implements the ControllerServer.
 	*controllerService
 

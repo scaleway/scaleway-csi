@@ -7,7 +7,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/scaleway/scaleway-csi/pkg/scaleway"
-	block "github.com/scaleway/scaleway-sdk-go/api/block/v1alpha1"
+	block "github.com/scaleway/scaleway-sdk-go/api/block/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 )
 
@@ -1090,8 +1090,7 @@ func Test_parseStartingToken(t *testing.T) {
 			args: args{
 				token: "-2",
 			},
-			want:    0,
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "123",
@@ -1171,6 +1170,36 @@ func Test_publishedNodeIDs(t *testing.T) {
 			t.Parallel()
 			if got := publishedNodeIDs(tt.args.volume); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("publishedNodeIDs() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_stripSecretFromReq(t *testing.T) {
+	type args struct {
+		req any
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "test",
+			args: args{
+				req: &csi.CreateVolumeRequest{
+					Name:       "test",
+					Secrets:    map[string]string{"test": "secret"},
+					Parameters: map[string]string{"iops": "15000"},
+				},
+			},
+			want: "{Name:test CapacityRange:<nil> VolumeCapabilities:[] Parameters:map[iops:15000] Secrets:[test:<redacted>] VolumeContentSource:<nil> AccessibilityRequirements:<nil> MutableParameters:map[]}",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stripSecretFromReq(tt.args.req); got != tt.want {
+				t.Errorf("stripSecretFromReq() = %v, want %v", got, tt.want)
 			}
 		})
 	}

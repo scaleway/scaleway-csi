@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	block "github.com/scaleway/scaleway-sdk-go/api/block/v1alpha1"
+	block "github.com/scaleway/scaleway-sdk-go/api/block/v1"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"golang.org/x/exp/maps"
@@ -164,6 +164,11 @@ func (f *Fake) CreateVolume(ctx context.Context, name string, snapshotID string,
 		zone = f.defaultZone
 	}
 
+	scwSize, err := NewSize(size)
+	if err != nil {
+		return nil, err
+	}
+
 	volume := &block.Volume{
 		ID:        uuid.NewString(),
 		Name:      name,
@@ -190,7 +195,7 @@ func (f *Fake) CreateVolume(ctx context.Context, name string, snapshotID string,
 		volume.ParentSnapshotID = scw.StringPtr(snapshotID)
 		volume.Size = s.Size
 	} else {
-		volume.Size = scw.Size(size)
+		volume.Size = scwSize
 	}
 
 	f.volumes[volume.ID] = volume
@@ -387,12 +392,17 @@ func (f *Fake) ResizeVolume(ctx context.Context, volumeID string, zone scw.Zone,
 		zone = f.defaultZone
 	}
 
+	scwSize, err := NewSize(size)
+	if err != nil {
+		return err
+	}
+
 	if s, ok := f.volumes[volumeID]; ok && s.Zone == zone {
-		if size < int64(f.volumes[volumeID].Size) {
+		if scwSize < f.volumes[volumeID].Size {
 			return errors.New("new volume size is less than current volume size")
 		}
 
-		f.volumes[volumeID].Size = scw.Size(size)
+		f.volumes[volumeID].Size = scwSize
 
 		return nil
 	}
