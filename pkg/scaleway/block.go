@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	block "github.com/scaleway/scaleway-sdk-go/api/block/v1alpha1"
+	block "github.com/scaleway/scaleway-sdk-go/api/block/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 )
 
@@ -199,10 +199,15 @@ func (s *Scaleway) ResizeVolume(ctx context.Context, volumeID string, zone scw.Z
 		return &scw.ResourceNotFoundError{Resource: snapshotResource, ResourceID: volumeID}
 	}
 
+	scwSize, err := NewSize(size)
+	if err != nil {
+		return err
+	}
+
 	if _, err := s.block.UpdateVolume(&block.UpdateVolumeRequest{
 		VolumeID: volumeID,
 		Zone:     zone,
-		Size:     scw.SizePtr(scw.Size(size)),
+		Size:     scw.SizePtr(scwSize),
 	}, scw.WithContext(ctx)); err != nil {
 		return fmt.Errorf("failed to update volume with new size: %w", err)
 	}
@@ -232,6 +237,11 @@ func (s *Scaleway) CreateVolume(ctx context.Context, name, snapshotID string, si
 		Zone:     zone,
 	}
 
+	scwSize, err := NewSize(size)
+	if err != nil {
+		return nil, err
+	}
+
 	if snapshotID != "" {
 		if !isValidUUID(snapshotID) {
 			return nil, &scw.ResourceNotFoundError{Resource: snapshotResource, ResourceID: snapshotID}
@@ -239,11 +249,11 @@ func (s *Scaleway) CreateVolume(ctx context.Context, name, snapshotID string, si
 
 		req.FromSnapshot = &block.CreateVolumeRequestFromSnapshot{
 			SnapshotID: snapshotID,
-			Size:       scw.SizePtr(scw.Size(size)),
+			Size:       scw.SizePtr(scwSize),
 		}
 	} else {
 		req.FromEmpty = &block.CreateVolumeRequestFromEmpty{
-			Size: scw.Size(size),
+			Size: scwSize,
 		}
 	}
 

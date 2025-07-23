@@ -20,10 +20,9 @@ import (
 // name of the secret for the encryption passphrase.
 const encryptionPassphraseKey = "encryptionPassphrase"
 
-// nodeService implements csi.NodeServer.
-var _ csi.NodeServer = &nodeService{}
-
 type nodeService struct {
+	csi.UnimplementedNodeServer
+
 	diskUtils DiskUtils
 
 	nodeID   string
@@ -57,7 +56,7 @@ func newNodeService() (*nodeService, error) {
 // for the first time or for the first time since a NodeUnstageVolume call
 // for the specified volume was called and returned success on that node.
 func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.V(4).Infof("NodeStageVolume called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("NodeStageVolume called with %s", stripSecretFromReq(req))
 
 	// check arguments
 	volumeID, _, err := ExtractIDAndZone(req.GetVolumeId())
@@ -169,7 +168,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 // NodeUnstageVolume is a reverse operation of NodeStageVolume.
 // It must undo the work by the corresponding NodeStageVolume.
 func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	klog.V(4).Infof("NodeUnstageVolume called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("NodeUnstageVolume called with %s", stripSecretFromReq(req))
 
 	// check arguments
 	volumeID, _, err := ExtractIDAndZone(req.GetVolumeId())
@@ -213,7 +212,7 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 // on a node. The Plugin SHALL assume that this RPC will be executed
 // on the node where the volume will be used.
 func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	klog.V(4).Infof("NodePublishVolume called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("NodePublishVolume called with %s", stripSecretFromReq(req))
 
 	// check arguments
 	volumeID, _, err := ExtractIDAndZone(req.GetVolumeId())
@@ -313,7 +312,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 // NodeUnpublishVolume is a reverse operation of NodePublishVolume.
 // This RPC MUST undo the work by the corresponding NodePublishVolume.
 func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	klog.V(4).Infof("NodeUnpublishVolume called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("NodeUnpublishVolume called with %s", stripSecretFromReq(req))
 
 	targetPath := req.GetTargetPath()
 	if targetPath == "" {
@@ -329,7 +328,7 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 // NodeGetVolumeStats returns the volume capacity statistics available for the volume
 func (d *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	klog.V(4).Infof("NodeGetVolumeStats called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("NodeGetVolumeStats called with %s", stripSecretFromReq(req))
 
 	volumeID, _, err := ExtractIDAndZone(req.GetVolumeId())
 	if err != nil {
@@ -362,26 +361,26 @@ func (d *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Errorf(codes.Internal, "error doing stat on %s: %s", volumePath, err.Error())
 	}
 
-	totalBytes := fs.Blocks * uint64(fs.Bsize)
-	availableBytes := fs.Bfree * uint64(fs.Bsize)
+	totalBytes := uint64ToInt64(fs.Blocks) * int64(fs.Bsize)
+	availableBytes := uint64ToInt64(fs.Bfree) * int64(fs.Bsize)
 	usedBytes := totalBytes - availableBytes
 
-	totalInodes := fs.Files
-	freeInodes := fs.Ffree
+	totalInodes := uint64ToInt64(fs.Files)
+	freeInodes := uint64ToInt64(fs.Ffree)
 	usedInodes := totalInodes - freeInodes
 
 	diskUsage := &csi.VolumeUsage{
 		Unit:      csi.VolumeUsage_BYTES,
-		Total:     int64(totalBytes),
-		Available: int64(availableBytes),
-		Used:      int64(usedBytes),
+		Total:     totalBytes,
+		Available: availableBytes,
+		Used:      usedBytes,
 	}
 
 	inodesUsage := &csi.VolumeUsage{
 		Unit:      csi.VolumeUsage_INODES,
-		Total:     int64(totalInodes),
-		Available: int64(freeInodes),
-		Used:      int64(usedInodes),
+		Total:     totalInodes,
+		Available: freeInodes,
+		Used:      usedInodes,
 	}
 
 	return &csi.NodeGetVolumeStatsResponse{
@@ -443,7 +442,7 @@ func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 // NodeExpandVolume expands the given volume
 func (d *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	klog.V(4).Infof("NodeExpandVolume called with %s", stripSecretFromReq(*req))
+	klog.V(4).Infof("NodeExpandVolume called with %s", stripSecretFromReq(req))
 
 	volumeID, _, err := ExtractIDAndZone(req.GetVolumeId())
 	if err != nil {

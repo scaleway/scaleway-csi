@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,7 +14,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/scaleway/scaleway-csi/pkg/scaleway"
-	block "github.com/scaleway/scaleway-sdk-go/api/block/v1alpha1"
+	block "github.com/scaleway/scaleway-sdk-go/api/block/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"golang.org/x/exp/slices"
 	"google.golang.org/grpc/codes"
@@ -247,12 +248,22 @@ const secretsField = "Secrets"
 func stripSecretFromReq(req any) string {
 	ret := "{"
 
+	// Try to dereference pointer if needed.
 	reqValue := reflect.ValueOf(req)
+	if reqValue.Kind() == reflect.Pointer {
+		reqValue = reqValue.Elem()
+	}
+
 	reqType := reqValue.Type()
 	if reqType.Kind() == reflect.Struct {
 		for i := 0; i < reqValue.NumField(); i++ {
 			field := reqType.Field(i)
 			value := reqValue.Field(i)
+
+			// Skip non-exported fields.
+			if !field.IsExported() {
+				continue
+			}
 
 			valueToPrint := fmt.Sprintf("%+v", value.Interface())
 
@@ -285,8 +296,13 @@ func (d *controllerService) getOrCreateVolume(ctx context.Context, name, snapsho
 		zones = append(zones, scw.Zone(""))
 	}
 
+	scwSize, err := scaleway.NewSize(size)
+	if err != nil {
+		return nil, fmt.Errorf("size is invalid: %w", err)
+	}
+
 	for _, zone := range zones {
-		volume, err := d.scaleway.GetVolumeByName(ctx, name, scw.Size(size), zone)
+		volume, err := d.scaleway.GetVolumeByName(ctx, name, scwSize, zone)
 		if err != nil && !errors.Is(err, scaleway.ErrVolumeNotFound) {
 			return nil, fmt.Errorf("failed to try to get existing volume %q: %w", name, err)
 		}
@@ -361,7 +377,7 @@ func parseCreateVolumeParams(params map[string]string) (*uint32, bool, error) {
 			encrypted = encryptedValue
 
 		case volumeIOPSKey:
-			iops, err := strconv.Atoi(value)
+			iops, err := strconv.ParseUint(value, 10, 0)
 			if err != nil {
 				return nil, false, fmt.Errorf("invalid value (%s) for parameter %s: %s", value, key, err)
 			}
@@ -398,7 +414,7 @@ func csiVolume(volume *block.Volume) *csi.Volume {
 
 	return &csi.Volume{
 		VolumeId:      expandZonalID(volume.ID, volume.Zone),
-		CapacityBytes: int64(volume.Size),
+		CapacityBytes: scwSizetoInt64(volume.Size),
 		AccessibleTopology: []*csi.Topology{
 			{
 				Segments: map[string]string{ZoneTopologyKey: volume.Zone.String()},
@@ -427,7 +443,7 @@ func publishedNodeIDs(volume *block.Volume) []string {
 // csiSnapshot returns a CSI Snapshot from a Snapshot.
 func csiSnapshot(snapshot *block.Snapshot) *csi.Snapshot {
 	snap := &csi.Snapshot{
-		SizeBytes:  int64(snapshot.Size),
+		SizeBytes:  scwSizetoInt64(snapshot.Size),
 		SnapshotId: expandZonalID(snapshot.ID, snapshot.Zone),
 		ReadyToUse: snapshot.Status == block.SnapshotStatusAvailable,
 	}
@@ -449,13 +465,9 @@ func parseStartingToken(token string) (uint32, error) {
 		return 0, nil
 	}
 
-	start, err := strconv.Atoi(token)
+	start, err := strconv.ParseUint(token, 10, 0)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse token into a number: %w", err)
-	}
-
-	if start < 0 {
-		return 0, nil
 	}
 
 	return uint32(start), nil
@@ -491,4 +503,20 @@ func codeFromScalewayError(err error) codes.Code {
 	default:
 		return codes.Internal
 	}
+}
+
+// scwSizetoInt64 converts an scw.Size to int64. It panics if the size exceeds math.MaxInt64.
+func scwSizetoInt64(s scw.Size) int64 {
+	return uint64ToInt64(uint64(s))
+}
+
+// uint64ToInt64 converts an uint64 value to an int64 value. It panics if the value
+// exceeds math.MaxInt64.
+func uint64ToInt64(v uint64) int64 {
+	// This should never happen in practice.
+	if v > math.MaxInt64 {
+		panic("value exceeds max int64")
+	}
+
+	return int64(v)
 }

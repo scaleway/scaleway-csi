@@ -13,10 +13,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/sftp"
+	"github.com/scaleway/scaleway-sdk-go/api/block/v1"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	"github.com/scaleway/scaleway-sdk-go/api/marketplace/v2"
 	"github.com/scaleway/scaleway-sdk-go/scw"
@@ -42,7 +44,7 @@ var _ = Describe("Sanity", func() {
 		server, err := instanceAPI.CreateServer(&instance.CreateServerRequest{
 			Name:              "csi-sanity",
 			DynamicIPRequired: scw.BoolPtr(true),
-			Image:             image.ID,
+			Image:             &image.ID,
 			CommercialType:    instanceCommercialType,
 			RoutedIPEnabled:   scw.BoolPtr(true),
 			Tags:              []string{"AUTHORIZED_KEY=" + strings.ReplaceAll(sshPublicKey, " ", "_")},
@@ -52,9 +54,57 @@ var _ = Describe("Sanity", func() {
 		DeferCleanup(func(ctx SpecContext) {
 			_, err = instanceAPI.ServerAction(&instance.ServerActionRequest{
 				ServerID: server.Server.ID,
-				Action:   instance.ServerActionTerminate,
+				Action:   instance.ServerActionPoweroff,
 			}, scw.WithContext(ctx))
 			Expect(err).NotTo(HaveOccurred())
+
+			_, err = instanceAPI.WaitForServer(&instance.WaitForServerRequest{
+				ServerID: server.Server.ID,
+				Zone:     server.Server.Zone,
+			}, scw.WithContext(ctx))
+			Expect(err).ToNot(HaveOccurred())
+
+			// On success, we expect the server to only have one volume attached (the boot volume).
+			if !CurrentSpecReport().Failed() {
+				Expect(server.Server.Volumes).To(HaveLen(1))
+			}
+
+			for _, volume := range server.Server.Volumes {
+				Expect(volume.VolumeType).To(Equal(instance.VolumeServerVolumeTypeSbsVolume))
+
+				_, err := instanceAPI.DetachServerVolume(&instance.DetachServerVolumeRequest{
+					Zone:     server.Server.Zone,
+					ServerID: server.Server.ID,
+					VolumeID: volume.ID,
+				}, scw.WithContext(ctx))
+				Expect(err).ToNot(HaveOccurred())
+
+				Eventually(func() error {
+					volume, err := blockAPI.GetVolume(&block.GetVolumeRequest{
+						Zone:     server.Server.Zone,
+						VolumeID: volume.ID,
+					}, scw.WithContext(ctx))
+					if err != nil {
+						return fmt.Errorf("failed to get volume: %w", err)
+					}
+
+					if volume.Status != block.VolumeStatusAvailable {
+						return fmt.Errorf("volume is not available: %s", volume.Status)
+					}
+
+					return nil
+				}).WithContext(ctx).WithTimeout(time.Minute).ProbeEvery(time.Second).Should(Succeed())
+
+				Expect(blockAPI.DeleteVolume(&block.DeleteVolumeRequest{
+					Zone:     server.Server.Zone,
+					VolumeID: volume.ID,
+				}, scw.WithContext(ctx))).To(Succeed())
+			}
+
+			Expect(instanceAPI.DeleteServer(&instance.DeleteServerRequest{
+				Zone:     server.Server.Zone,
+				ServerID: server.Server.ID,
+			}, scw.WithContext(ctx))).To(Succeed())
 		})
 
 		// Poweron server and wait for it to start.
@@ -70,11 +120,11 @@ var _ = Describe("Sanity", func() {
 
 		// Make sure instance is running and has an IP.
 		Expect(server.Server.State).To(Equal(instance.ServerStateRunning))
-		Expect(server.Server.PublicIP).ToNot(BeNil())
+		Expect(server.Server.PublicIPs).ToNot(BeEmpty())
 
 		By("Connecting to the instance")
 		client := &sshClient{
-			Address: server.Server.PublicIP.Address.String(),
+			Address: server.Server.PublicIPs[0].Address.String(),
 			Signer:  sshSigner,
 		}
 		Eventually(client.Open).WithContext(ctx).Should(Succeed())
@@ -130,7 +180,12 @@ var _ = Describe("Sanity", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Running csi-sanity on instance")
-		sanityResult, err := client.RunCmd(ctx, fmt.Sprintf("%s --csi.endpoint=unix:/tmp/csi.sock --ginkgo.no-color", remoteSanityPath), nil)
+		sanityResult, err := client.RunCmd(ctx, fmt.Sprintf(
+			"%s --csi.endpoint=unix:/tmp/csi.sock --ginkgo.no-color "+
+				// Max name in test exceeds Scaleway Block Storage API max name length of 100 chars on volumes and snapshots.
+				// https://github.com/kubernetes-csi/csi-test/blob/35eb219ce5e9f6476ae4a451b6760597a9547563/pkg/sanity/controller.go#L42
+				`--ginkgo.skip="maximum-length name"`,
+			remoteSanityPath), nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Waiting for results")
@@ -210,12 +265,13 @@ func (s *sshClient) RunCmd(ctx context.Context, cmd string, env map[string]strin
 	result := make(chan sshResult)
 	resultInternal := make(chan sshResult, 1)
 
-	var b bytes.Buffer
-	session.Stdout = &b
-	session.Stderr = &b
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	session.Stdout = &stdout
+	session.Stderr = &stderr
 	go func() {
 		err := session.Run(fmt.Sprintf("%s %s", envString.String(), cmd))
-		resultInternal <- sshResult{Err: err, Output: b.String()}
+		resultInternal <- sshResult{Err: err, Output: fmt.Sprintf("Stdout: %s\nStderr: %s", stdout.String(), stderr.String())}
 		close(resultInternal)
 	}()
 

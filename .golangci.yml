@@ -1,18 +1,35 @@
+version: "2"
 linters:
   enable:
     - dupl
     - errname
     - ginkgolinter
     - goconst
-    - godox
     - gosec
     - nilerr
     - prealloc
     - reassign
     - tparallel
     - wrapcheck
-
-linters-settings:
- wrapcheck:
-    ignorePackageGlobs:
-      - google.golang.org/grpc/status
+  settings:
+    wrapcheck:
+      ignore-package-globs:
+        - google.golang.org/grpc/status
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
