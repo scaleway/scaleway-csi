@@ -99,6 +99,10 @@ Some examples are available [here](./examples/kubernetes).
 These steps will cover how to install the Scaleway CSI driver in your Kubernetes
 cluster, using Helm.
 
+> [!WARNING]
+> You should NOT install the Scaleway Block Volume CSI driver in a **Scaleway Kubernetes
+> managed cluster (Kapsule / Kosmos)** as it is already installed and configured automatically.
+
 #### Requirements
 
 - A Kubernetes cluster running on Scaleway instances (v1.20+)
@@ -139,6 +143,16 @@ cluster, using Helm.
     ```
 
     You should see the scaleway-csi-controller and the scaleway-csi-node pods.
+
+> [!IMPORTANT]
+> When upgrading an existing installation, you MUST upgrade CRDs before calling helm upgrade command.
+> CRDs are not updated by Helm. See [HIP-0011](https://github.com/helm/community/blob/main/hips/hip-0011.md) for details.
+>
+> ```bash
+> helm repo update
+> helm show crds scaleway/scaleway-csi | kubectl apply --server-side --force-conflicts -f -
+> helm upgrade --namespace kube-system --reuse-values scaleway-csi scaleway/scaleway-csi
+> ```
 
 ## Development
 
