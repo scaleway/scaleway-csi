@@ -22,8 +22,8 @@ func luksFormat(devicePath string, passphrase string) error {
 		"--hash", defaultLuksHash, // hash algorithm
 		"--cipher", defaultLuksCipher, // the cipher used
 		"--key-size", defaultLuksKeyize, // the size of the encryption key
-		devicePath,                 // device to encrypt
-		"--key-file", "/dev/stdin", // read the passphrase from stdin
+		devicePath,        // device to encrypt
+		"--key-file", "-", // read the passphrase from stdin
 	}
 
 	luksFormatCmd := exec.Command(cryptsetupCmd, args...)
@@ -38,10 +38,10 @@ func luksFormat(devicePath string, passphrase string) error {
 
 func luksOpen(devicePath string, mapperFile string, passphrase string) error {
 	args := []string{
-		"luksOpen",                 // open
-		devicePath,                 // device to open
-		mapperFile,                 // mapper file in which to open the device
-		"--key-file", "/dev/stdin", // read the passphrase from stdin
+		"luksOpen",        // open
+		devicePath,        // device to open
+		mapperFile,        // mapper file in which to open the device
+		"--key-file", "-", // read the passphrase from stdin
 	}
 
 	luksOpenCmd := exec.Command(cryptsetupCmd, args...)
@@ -71,9 +71,9 @@ func luksClose(mapperFile string) error {
 
 func luksResize(mapperFile, passphrase string) error {
 	args := []string{
-		"resize",                   // resize
-		mapperFile,                 // mapper file to resize
-		"--key-file", "/dev/stdin", // read the passphrase from stdin
+		"resize",          // resize
+		mapperFile,        // mapper file to resize
+		"--key-file", "-", // read the passphrase from stdin
 	}
 
 	luksResizeCmd := exec.Command(cryptsetupCmd, args...)
