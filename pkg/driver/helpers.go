@@ -9,14 +9,15 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/scaleway/scaleway-csi/pkg/scaleway"
 	block "github.com/scaleway/scaleway-sdk-go/api/block/v1"
+	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
-	"golang.org/x/exp/slices"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -519,4 +520,30 @@ func uint64ToInt64(v uint64) int64 {
 	}
 
 	return int64(v)
+}
+
+// attachedScratchVolumes returns the number of attached scratch volumes, based
+// on the instance metadata.
+func attachedScratchVolumes(md *instance.Metadata) int {
+	var count int
+
+	for _, vol := range md.Volumes {
+		if vol.VolumeType == "scratch" {
+			count++
+		}
+	}
+
+	return count
+}
+
+// maxVolumesPerNode returns the maximum number of volumes that can be attached to a node,
+// after substracting the system root volume and the provided number of reserved volumes.
+// It returns an error if the result is 0 or less.
+func maxVolumesPerNode(reservedCount int) (int64, error) {
+	max := scaleway.MaxVolumesPerNode - reservedCount - 1
+	if max <= 0 {
+		return 0, fmt.Errorf("max number of volumes that can be attached to this node must be at least 1, currently is %d", max)
+	}
+
+	return int64(max), nil
 }

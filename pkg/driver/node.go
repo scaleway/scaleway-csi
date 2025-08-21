@@ -25,8 +25,9 @@ type nodeService struct {
 
 	diskUtils DiskUtils
 
-	nodeID   string
-	nodeZone scw.Zone
+	nodeID            string
+	nodeZone          scw.Zone
+	maxVolumesPerNode int64
 }
 
 func newNodeService() (*nodeService, error) {
@@ -40,10 +41,16 @@ func newNodeService() (*nodeService, error) {
 		return nil, fmt.Errorf("invalid zone in metadata: %w", err)
 	}
 
+	maxVolumesPerNode, err := maxVolumesPerNode(attachedScratchVolumes(metadata))
+	if err != nil {
+		return nil, err
+	}
+
 	return &nodeService{
-		diskUtils: newDiskUtils(),
-		nodeID:    metadata.ID,
-		nodeZone:  zone,
+		diskUtils:         newDiskUtils(),
+		nodeID:            metadata.ID,
+		nodeZone:          zone,
+		maxVolumesPerNode: maxVolumesPerNode,
 	}, nil
 }
 
@@ -431,7 +438,7 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	return &csi.NodeGetInfoResponse{
 		NodeId:            d.nodeZone.String() + "/" + d.nodeID,
-		MaxVolumesPerNode: scaleway.MaxVolumesPerNode - 1, // One is already used by the l_ssd or b_ssd root volume
+		MaxVolumesPerNode: d.maxVolumesPerNode,
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{
 				ZoneTopologyKey: d.nodeZone.String(),
