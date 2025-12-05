@@ -13,7 +13,7 @@ require (
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.34.0.20250722094606-7aefa3e74bff
 	golang.org/x/crypto v0.40.0
 	golang.org/x/exp v0.0.0-20250718183923-645b1fa84792
-	golang.org/x/sys v0.34.0
+	golang.org/x/sys v0.38.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
 	k8s.io/klog/v2 v2.130.1
