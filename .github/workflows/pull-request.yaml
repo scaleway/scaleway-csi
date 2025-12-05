@@ -16,7 +16,7 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
     - name: checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 1
     - name: Run unit tests
@@ -34,7 +34,7 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
     - name: checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 1
     - name: Building binary
