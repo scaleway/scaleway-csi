@@ -1,6 +1,6 @@
 module github.com/scaleway/scaleway-csi
 
-go 1.24.5
+go 1.25.5
 
 require (
 	github.com/container-storage-interface/spec v1.11.0
