@@ -15,7 +15,7 @@ require (
 	golang.org/x/exp v0.0.0-20250718183923-645b1fa84792
 	golang.org/x/sys v0.38.0
 	google.golang.org/grpc v1.73.0
-	google.golang.org/protobuf v1.36.7
+	google.golang.org/protobuf v1.36.11
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/mount-utils v0.33.3
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
