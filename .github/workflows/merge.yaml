@@ -22,7 +22,7 @@ jobs:
           sudo service docker restart
       - name: Set up Docker Buildx
         id: buildx
-        uses: crazy-max/ghaction-docker-buildx@v1
+        uses: crazy-max/ghaction-docker-buildx@v3
         with:
           version: latest
       - name: Docker login
