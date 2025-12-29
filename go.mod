@@ -1,6 +1,6 @@
 module github.com/scaleway/scaleway-csi
 
-go 1.24.5
+go 1.25.0
 
 require (
 	github.com/container-storage-interface/spec v1.11.0
@@ -17,8 +17,8 @@ require (
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/mount-utils v0.33.3
-	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
+	k8s.io/mount-utils v0.35.0
+	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	oya.to/namedlocker v1.0.0
 )
 
