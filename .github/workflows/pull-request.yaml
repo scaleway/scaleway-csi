@@ -7,35 +7,33 @@ jobs:
   unit-test:
     strategy:
       matrix:
-        go-version: [1.24.x]
-        platform: [ubuntu-latest]
+        go-version: [1.26.x]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.platform }}
     steps:
+    # Checkout should always be before setup-go to ensure caching is working
+    - name: checkout
+      uses: actions/checkout@v6
     - name: Install Go
       uses: actions/setup-go@v6
       with:
         go-version: ${{ matrix.go-version }}
-    - name: checkout
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 1
     - name: Run unit tests
       run: make test
+
   build-test:
     strategy:
       matrix:
-        go-version: [1.24.x]
-        platform: [ubuntu-latest]
-        arch: [386, amd64, arm, arm64]
+        go-version: [1.26.x]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.platform }}
     steps:
+    # Checkout should always be before setup-go to ensure caching is working
+    - name: checkout
+      uses: actions/checkout@v6
     - name: Install Go
       uses: actions/setup-go@v6
       with:
         go-version: ${{ matrix.go-version }}
-    - name: checkout
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 1
     - name: Building binary
-      run: GOARCH=${{ matrix.arch }} make compile
+      run: make compile

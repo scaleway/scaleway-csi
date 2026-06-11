@@ -1,6 +1,6 @@
 OS ?= $(shell go env GOOS)
 ARCH ?= $(shell go env GOARCH)
-ALL_PLATFORM = linux/amd64,linux/arm/v7,linux/arm64
+ARCHS ?= amd64 arm64
 
 BUILD_DATE ?= $(shell date -Is)
 
@@ -37,19 +37,33 @@ fmt:
 
 .PHONY: compile
 compile:
-	go build -v -o scaleway-csi -ldflags "-X driver.driverVersion=$(TAG)" ./cmd/scaleway-csi
+	go build -v -o scaleway-csi -ldflags "-X github.com/scaleway/scaleway-csi/pkg/driver.driverVersion=$(TAG) -X github.com/scaleway/scaleway-csi/pkg/driver.buildDate=$(BUILD_DATE) -X github.com/scaleway/scaleway-csi/pkg/driver.gitCommit=$(COMMIT_SHA)" ./cmd/scaleway-csi
 
 .PHONY: docker-build
 docker-build:
 	@echo "Building scaleway-csi for ${ARCH}"
 	docker build . --platform=linux/$(ARCH) --build-arg ARCH=$(ARCH) --build-arg TAG=$(TAG) --build-arg COMMIT_SHA=$(COMMIT_SHA) --build-arg BUILD_DATE=$(BUILD_DATE) -f Dockerfile -t ${FULL_IMAGE}:${IMAGE_TAG}-$(ARCH)
 
-.PHONY: docker-buildx-all
-docker-buildx-all:
-	@echo "Making release for tag $(IMAGE_TAG)"
-	docker buildx build --build-arg TAG=$(TAG) --build-arg COMMIT_SHA=$(COMMIT_SHA) --build-arg BUILD_DATE=$(BUILD_DATE) --platform=$(ALL_PLATFORM) --push -t $(FULL_IMAGE):$(IMAGE_TAG) .
+.PHONY: docker-push-arch
+docker-push-arch:
+	@echo "Building and pushing scaleway-csi for $(ARCH)"
+	mkdir -p digests
+	docker buildx build . --platform=linux/$(ARCH) --build-arg TAG=$(TAG) --build-arg COMMIT_SHA=$(COMMIT_SHA) --build-arg BUILD_DATE=$(BUILD_DATE) \
+		--output type=image,name=$(FULL_IMAGE),push=true,push-by-digest=true,name-canonical=true \
+		--metadata-file digests/$(ARCH).json
+	jq -r '."containerimage.digest"' digests/$(ARCH).json > digests/$(ARCH)
+
+.PHONY: docker-manifest
+docker-manifest:
+	@echo "Creating manifest $(FULL_IMAGE):$(IMAGE_TAG) from $(foreach arch,$(ARCHS),digests/$(arch))"
+	docker buildx imagetools create -t $(FULL_IMAGE):$(IMAGE_TAG) $(foreach arch,$(ARCHS),$(FULL_IMAGE)@$(shell cat digests/$(arch)))
+
+.PHONY: docker-push-all
+docker-push-all:
+	@for arch in $(ARCHS); do $(MAKE) docker-push-arch ARCH=$$arch; done
+	$(MAKE) docker-manifest
 
 ## Release
 .PHONY: release
-release: docker-buildx-all
+release: docker-push-all
 
