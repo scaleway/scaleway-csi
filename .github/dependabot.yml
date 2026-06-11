@@ -8,9 +8,14 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-        interval: weekly
+      interval: weekly
     commit-message:
       prefix: "chore"
+    groups:
+      k8s:
+        patterns:
+        - "k8s.io/*"
+        - "sigs.k8s.io/*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

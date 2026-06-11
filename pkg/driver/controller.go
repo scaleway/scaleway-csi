@@ -5,13 +5,13 @@ import (
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/scaleway/scaleway-csi/pkg/internal/namedlocker"
 	"github.com/scaleway/scaleway-csi/pkg/scaleway"
 	block "github.com/scaleway/scaleway-sdk-go/api/block/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
-	"oya.to/namedlocker"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"k8s.io/klog/v2"
 )
 
@@ -55,7 +55,7 @@ func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCa
 func (d *Driver) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	// TODO
 	return &csi.ProbeResponse{
-		Ready: &wrappers.BoolValue{
+		Ready: &wrapperspb.BoolValue{
 			Value: true,
 		},
 	}, nil

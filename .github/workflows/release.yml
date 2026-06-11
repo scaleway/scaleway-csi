@@ -4,42 +4,86 @@ on:
     tags:
       - '*'
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.tagName.outputs.tag }}
+      is_highest: ${{ steps.highestTag.outputs.is_highest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Unshallow
-        run: git fetch --prune --unshallow
+        with:
+          fetch-depth: 0
+      - name: Get tag
+        uses: little-core-labs/get-git-tag@v3.0.2
+        id: tagName
       - name: Highest tag
         id: highestTag
         run: |
           git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-          echo ::set-output name=highest::$(git tag | grep -E "^v?([0-9]+\.)+[0-9]+$" | sort -r -V | head -n1)
-      - name: Enable experimental on dockerd
-        run: |
-          echo $'{\n    "experimental": true\n}' | sudo tee /etc/docker/daemon.json
-          sudo service docker restart
+          highest=$(git tag | grep -E "^v?([0-9]+\.)+[0-9]+$" | sort -r -V | head -n1)
+          if [ "${{ steps.tagName.outputs.tag }}" = "$highest" ]; then
+            echo is_highest=true >> $GITHUB_OUTPUT
+          else
+            echo is_highest=false >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: prepare
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
-        id: buildx
-        uses: crazy-max/ghaction-docker-buildx@v3
-        with:
-          version: latest
+        uses: docker/setup-buildx-action@v4
       - name: Docker login
-        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
-      - name: Get tag
-        uses: olegtarasov/get-tag@v2.1
-        id: tagName
-      - name: Make release
-        run: make release
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build and push image
+        run: make docker-push-arch
         env:
-          DOCKER_CLI_EXPERIMENTAL: enabled
-          TAG: ${{ steps.tagName.outputs.tag }}
-          IMAGE_TAG: ${{ steps.tagName.outputs.tag }}
-      - name: Push latest
-        if: steps.tagName.outputs.tag == steps.highestTag.outputs.highest
-        run: make release
+          ARCH: ${{ matrix.arch }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+      - name: Upload digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ matrix.arch }}
+          path: digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  manifest:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          path: digests
+          pattern: digests-*
+          merge-multiple: true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Docker login
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Create version manifest
+        run: make docker-manifest
         env:
-          DOCKER_CLI_EXPERIMENTAL: enabled
-          TAG: ${{ steps.tagName.outputs.tag }}
-          IMAGE_TAG: latest
+          IMAGE_TAG: ${{ needs.prepare.outputs.tag }}
+      - name: Create latest manifest
+        if: needs.prepare.outputs.is_highest == 'true'
+        run: make docker-manifest IMAGE_TAG=latest
