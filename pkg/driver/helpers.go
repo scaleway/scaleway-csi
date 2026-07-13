@@ -501,6 +501,8 @@ func codeFromScalewayError(err error) codes.Code {
 	case scaleway.IsPreconditionFailedError(err):
 		// Most likely when trying to delete a volume that is already attached.
 		return codes.FailedPrecondition
+	case scaleway.IsQuotasExceededError(err):
+		return codes.ResourceExhausted
 	default:
 		return codes.Internal
 	}
