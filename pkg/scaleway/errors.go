@@ -37,6 +37,12 @@ func IsPreconditionFailedError(err error) bool {
 	return errors.As(err, &precondition)
 }
 
+// IsQuotasExceededError returns true if the provided error is a QuotasExceededError.
+func IsQuotasExceededError(err error) bool {
+	var quotasExceededError *scw.QuotasExceededError
+	return errors.As(err, &quotasExceededError)
+}
+
 // IsGoneError returns true if the provided is an HTTP Gone error. Scaleway Block
 // API returns this error when trying to get a resource that was deleted.
 func IsGoneError(err error) bool {
