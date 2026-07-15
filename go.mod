@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/kubernetes-csi/csi-test/v5 v5.3.1
 	github.com/onsi/ginkgo/v2 v2.32.0
-	github.com/onsi/gomega v1.40.0
+	github.com/onsi/gomega v1.42.1
 	github.com/pkg/sftp v1.13.11
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.34.0.20250722094606-7aefa3e74bff
 	golang.org/x/crypto v0.54.0
