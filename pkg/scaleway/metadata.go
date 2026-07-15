@@ -15,12 +15,15 @@ import (
 )
 
 const (
-	metadataAPIURL         = "http://169.254.42.42/conf?format=json"
 	metadataRequestTimeout = 10 * time.Second
 	cloudInitDataFile      = "/run/cloud-init/instance-data.json"
 )
 
-var metadataSources = []metadataSource{cloudInitMetadataSource{}, apiMetadataSource{}}
+var metadataSources = []metadataSource{
+	cloudInitMetadataSource{},
+	apiMetadataSource{apiURL: "http://169.254.42.42/conf?format=json"},
+	apiMetadataSource{apiURL: "http://[fd00:42::42]/conf?format=json"},
+}
 
 // GetMetadata gets metadata of the instance that runs this function. It tries
 // each metadata source successively (cloud-init, api) until one responds successfully.
@@ -44,15 +47,17 @@ type metadataSource interface {
 }
 
 // apiMetadataSource retrieves Instance metadata from the Instance metadata API.
-type apiMetadataSource struct{}
+type apiMetadataSource struct {
+	apiURL string
+}
 
-func (apiMetadataSource) Get() (m *instance.Metadata, err error) {
+func (src apiMetadataSource) Get() (m *instance.Metadata, err error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), metadataRequestTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metadataAPIURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src.apiURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create metadata request")
+		return nil, fmt.Errorf("failed to create metadata request: %w", err)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
