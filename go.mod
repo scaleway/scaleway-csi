@@ -6,19 +6,18 @@ require (
 	github.com/container-storage-interface/spec v1.12.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
-	github.com/kubernetes-csi/csi-test/v5 v5.3.1
+	github.com/kubernetes-csi/csi-test/v5 v5.4.0
 	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.42.1
 	github.com/pkg/sftp v1.13.11
-	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.34.0.20250722094606-7aefa3e74bff
+	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.36
 	golang.org/x/crypto v0.54.0
-	golang.org/x/exp v0.0.0-20250718183923-645b1fa84792
 	golang.org/x/sys v0.47.0
-	google.golang.org/grpc v1.82.0
+	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.11
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/mount-utils v0.36.2
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 	oya.to/namedlocker v1.0.0
 )
 

@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -13,7 +14,6 @@ import (
 	block "github.com/scaleway/scaleway-sdk-go/api/block/v1"
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
-	"golang.org/x/exp/maps"
 )
 
 // Enforce interface.
@@ -53,8 +53,7 @@ func NewFake(servers []*instance.Server, zone scw.Zone) *Fake {
 // start (index of the first element) and max (amount of elements to return).
 // The f callback function allows to filter elements.
 func mapPaginatedRange[T any](m map[string]T, f func(T) bool, start, max uint32) (list []T, next string) {
-	keys := maps.Keys(m)
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(m))
 
 	// Return now if start index is above max index or we want no element.
 	if int(start) >= len(keys) {

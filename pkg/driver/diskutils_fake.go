@@ -2,15 +2,15 @@ package driver
 
 import (
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/scaleway/scaleway-sdk-go/api/instance/v1"
 	kmount "k8s.io/mount-utils"
 
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 	"golang.org/x/sys/unix"
 )
 
@@ -42,7 +42,7 @@ func (f *fakeDiskUtils) refreshDevices() {
 	// Remove devices no longer present in server object.
 	for p := range f.devices {
 		if strings.HasPrefix(p, diskByIDPath) &&
-			!slices.ContainsFunc(maps.Values(f.server.Volumes), func(v *instance.VolumeServer) bool {
+			!slices.ContainsFunc(slices.Collect(maps.Values(f.server.Volumes)), func(v *instance.VolumeServer) bool {
 				return devicePath(v.ID) == p
 			}) {
 			delete(f.devices, p)
