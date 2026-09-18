@@ -254,12 +254,16 @@ parameters:
 
 ## Encrypting Volumes
 
-This plugin supports at rest encryption of the volumes with Cryptsetup/LUKS.
+This plugin supports at rest encryption of the volumes with Cryptsetup/LUKS or [Scaleway Key Manager Service](https://www.scaleway.com/en/docs/key-manager/).
 
 ### Storage Class parameters
 
 In order to have an encrypted volume, `encrypted: true` needs to be added to the
-StorageClass parameters. You will also need a passphrase to encrypt/decrypt the volume,
+StorageClass parameters.
+
+### Cryptsetup/LUKS
+
+You will need a passphrase to encrypt/decrypt the volume,
 which is taken from the secrets passed to the `NodeStageVolume` and `NodeExpandVolume` method.
 
 The [external-provisioner](https://github.com/kubernetes-csi/external-provisioner)
@@ -293,8 +297,6 @@ data:
 and the following StorageClass:
 
 ```yaml
-# Volume expansion is supported with CSINodeExpandSecret feature gate since v1.25.0 or by default since v1.27.0
-allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -302,6 +304,8 @@ metadata:
 provisioner: csi.scaleway.com
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
+# Volume expansion is supported with CSINodeExpandSecret feature gate since v1.25.0 or by default since v1.27.0
+allowVolumeExpansion: true
 parameters:
   encrypted: "true"
   csi.storage.k8s.io/node-stage-secret-name: "enc-secret"
@@ -319,7 +323,45 @@ can also be used to avoid having one passphrase per StorageClass.
 
 > **Note**
 > Please note that prior to `v0.2.1` the expansion of encrypted volume was not possible,
-> `PersistentVolumes` created without the `csi.storage.k8s.io/node-stage-secret` annotations
+> `PersistentVolumes` created with the `csi.storage.k8s.io/node-stage-secret` annotations
 > will need to be patched manually if expansion is needed. Be sure to be extra careful doing
 > so as the needed fields are immutable and you'll need to force the patch (backup any data,
 > switch the `reclaimPolicy` of the volume to `Retain`, etc.).
+
+### Scaleway Key Manager
+
+You will need a KMS Key id to encrypt/decrypt the volume,
+please follow [documentation](https://www.scaleway.com/en/docs/key-manager/quickstart/#how-to-create-a-key-manager-key) to create a Key Manager Key.
+
+The [external-provisioner](https://github.com/kubernetes-csi/external-provisioner)
+is used to [pass down the key id down to the CSI plugin](https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html) (v1.0.1+).
+
+Some additional parameters are needed on the StorageClass:
+
+- `csi.storage.k8s.io/node-stage-kms-key-id`: The KMS key id
+- `csi.storage.k8s.io/node-expand-kms-key-id`: The KMS key id (see note below).
+
+> Volume expansion for encrypted volumes is only supported with the `CSINodeExpandSecret`
+> feature gate which is available since `v1.25.0` and by default since `v1.27.0`.
+
+StorageClass example:
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "sbs-default-kms-enc"
+provisioner: csi.scaleway.com
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+# Volume expansion is supported with CSINodeExpandSecret feature gate since v1.25.0 or by default since v1.27.0
+allowVolumeExpansion: true
+parameters:
+  encrypted: "true"
+  csi.storage.k8s.io/node-stage-kms-key-id: "22222222-2222-2222-2222-222222222222"
+  # Required for volume expansion
+  csi.storage.k8s.io/node-expand-kms-key-id: "22222222-2222-2222-2222-222222222222"
+```
+
+all the PVC created with the StorageClass `sbs-default-kms-enc` will be encrypted at
+rest with the KMS of id `22222222-2222-2222-2222-222222222222`.
