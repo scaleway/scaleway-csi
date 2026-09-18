@@ -111,11 +111,11 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	klog.V(4).Infof("volume %s with ID %s has device path %s", volumeName, volumeID, devicePath)
 
 	if encrypted {
-		passhrase, ok := req.GetSecrets()[encryptionPassphraseKey]
+		passphrase, ok := req.GetSecrets()[encryptionPassphraseKey]
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "missing passphrase secret for key %s", encryptionPassphraseKey)
 		}
-		devicePath, err = d.diskUtils.EncryptAndOpenDevice(scwVolumeID, passhrase)
+		devicePath, err = d.diskUtils.EncryptAndOpenDevice(scwVolumeID, passphrase)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "error encrypting/opening volume with ID %s: %s", volumeID, err.Error())
 		}

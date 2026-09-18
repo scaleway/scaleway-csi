@@ -510,7 +510,7 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 		return nil, status.Errorf(codes.OutOfRange, "capacityRange invalid: %s", err)
 	}
 
-	if volumeSize := scwSizetoInt64(volumeResp.Size); volumeSize >= newSize {
+	if volumeSize := scwSizeToInt64(volumeResp.Size); volumeSize >= newSize {
 		// Volume is already larger than or equal to the target capacity.
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volumeSize, NodeExpansionRequired: nodeExpansionRequired}, nil
 	}
