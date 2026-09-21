@@ -102,7 +102,7 @@ func (d *diskUtils) EncryptAndOpenDevice(volumeID string, passphrase string) (st
 		return encryptedDevicePath, nil
 	}
 
-	// let's check if the device is aready a luks device
+	// let's check if the device is already a luks device
 	devicePath, err := d.GetDevicePath(volumeID)
 	if err != nil {
 		return "", fmt.Errorf("error getting device path for volume %s: %w", volumeID, err)

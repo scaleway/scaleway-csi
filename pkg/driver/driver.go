@@ -37,7 +37,7 @@ const (
 	ControllerMode Mode = "controller"
 	// NodeMode represents the node mode.
 	NodeMode Mode = "node"
-	// AllMode represents the the controller and the node mode at the same time.
+	// AllMode represents the controller and the node mode at the same time.
 	AllMode Mode = "all"
 )
 
@@ -152,7 +152,7 @@ func (d *Driver) Run() error {
 	}
 
 	// log error through a grpc unary interceptor
-	logErrorHandler := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	logErrorHandler := func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		resp, err := handler(ctx, req)
 		if err != nil {
 			klog.Errorf("error for %s: %v", info.FullMethod, err)

@@ -172,8 +172,8 @@ func (f *Fake) CreateVolume(ctx context.Context, name string, snapshotID string,
 		ID:        uuid.NewString(),
 		Name:      name,
 		Type:      "nvme_5k",
-		CreatedAt: scw.TimePtr(time.Now()),
-		UpdatedAt: scw.TimePtr(time.Now()),
+		CreatedAt: new(time.Now()),
+		UpdatedAt: new(time.Now()),
 		Status:    block.VolumeStatusAvailable,
 		Zone:      zone,
 		Specs: &block.VolumeSpecifications{
@@ -191,7 +191,7 @@ func (f *Fake) CreateVolume(ctx context.Context, name string, snapshotID string,
 			return nil, &scw.ResourceNotFoundError{Resource: snapshotResource, ResourceID: snapshotID}
 		}
 
-		volume.ParentSnapshotID = scw.StringPtr(snapshotID)
+		volume.ParentSnapshotID = new(snapshotID)
 		volume.Size = s.Size
 	} else {
 		volume.Size = scwSize
