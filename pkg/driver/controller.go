@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	// controllerCapabilities represents the capabilites of the controller.
+	// controllerCapabilities represents the capabilities of the controller.
 	controllerCapabilities = []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
@@ -510,7 +510,7 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 		return nil, status.Errorf(codes.OutOfRange, "capacityRange invalid: %s", err)
 	}
 
-	if volumeSize := scwSizetoInt64(volumeResp.Size); volumeSize >= newSize {
+	if volumeSize := scwSizeToInt64(volumeResp.Size); volumeSize >= newSize {
 		// Volume is already larger than or equal to the target capacity.
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volumeSize, NodeExpansionRequired: nodeExpansionRequired}, nil
 	}

@@ -383,14 +383,14 @@ func parseCreateVolumeParams(params map[string]string) (*uint32, bool, error) {
 				return nil, false, fmt.Errorf("invalid value (%s) for parameter %s: %s", value, key, err)
 			}
 
-			perfIOPS = scw.Uint32Ptr(uint32(iops))
+			perfIOPS = new(uint32(iops))
 		default:
 			return nil, false, fmt.Errorf("invalid parameter key %s", key)
 		}
 	}
 
 	// Params are invalid if LegacyDefaultVolumeType is set but number of IOPS is
-	// different than what is supported.
+	// different from what is supported.
 	if volumeType == scaleway.LegacyDefaultVolumeType && perfIOPS != nil &&
 		*perfIOPS != scaleway.LegacyDefaultVolumeTypeIOPS {
 		return nil, false, fmt.Errorf("volume type %s only supports %d iops",
@@ -415,7 +415,7 @@ func csiVolume(volume *block.Volume) *csi.Volume {
 
 	return &csi.Volume{
 		VolumeId:      expandZonalID(volume.ID, volume.Zone),
-		CapacityBytes: scwSizetoInt64(volume.Size),
+		CapacityBytes: scwSizeToInt64(volume.Size),
 		AccessibleTopology: []*csi.Topology{
 			{
 				Segments: map[string]string{ZoneTopologyKey: volume.Zone.String()},
@@ -444,7 +444,7 @@ func publishedNodeIDs(volume *block.Volume) []string {
 // csiSnapshot returns a CSI Snapshot from a Snapshot.
 func csiSnapshot(snapshot *block.Snapshot) *csi.Snapshot {
 	snap := &csi.Snapshot{
-		SizeBytes:  scwSizetoInt64(snapshot.Size),
+		SizeBytes:  scwSizeToInt64(snapshot.Size),
 		SnapshotId: expandZonalID(snapshot.ID, snapshot.Zone),
 		ReadyToUse: snapshot.Status == block.SnapshotStatusAvailable,
 	}
@@ -508,8 +508,8 @@ func codeFromScalewayError(err error) codes.Code {
 	}
 }
 
-// scwSizetoInt64 converts an scw.Size to int64. It panics if the size exceeds math.MaxInt64.
-func scwSizetoInt64(s scw.Size) int64 {
+// scwSizeToInt64 converts an scw.Size to int64. It panics if the size exceeds math.MaxInt64.
+func scwSizeToInt64(s scw.Size) int64 {
 	return uint64ToInt64(uint64(s))
 }
 
@@ -539,7 +539,7 @@ func attachedScratchVolumes(md *instance.Metadata) int {
 }
 
 // maxVolumesPerNode returns the maximum number of volumes that can be attached to a node,
-// after substracting the system root volume and the provided number of reserved volumes.
+// after subtracting the system root volume and the provided number of reserved volumes.
 // It returns an error if the result is 0 or less.
 func maxVolumesPerNode(reservedCount int) (int64, error) {
 	max := scaleway.MaxVolumesPerNode - reservedCount - 1
