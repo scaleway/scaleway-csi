@@ -26,6 +26,8 @@ const (
 	volumeTypeKey = "type"
 	// encryptedKey is the key of the encrypted parameter.
 	encryptedKey = "encrypted"
+	// kmsKeyIDKey is the key of the kms key id parameter.
+	kmsKeyIDKey = "kmskeyid"
 	// volumeIOPSKey is the key of the iops parameter.
 	volumeIOPSKey = "iops"
 )
@@ -90,7 +92,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.InvalidArgument, "volumeCapabilities not supported: %s", err)
 	}
 
-	perfIOPS, encrypted, err := parseCreateVolumeParams(req.GetParameters())
+	perfIOPS, encrypted, kmsKeyID, err := parseCreateVolumeParams(req.GetParameters())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid parameters: %s:", err)
 	}
@@ -124,7 +126,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.InvalidArgument, "unable to choose zone from accessibilityRequirements: %s", err)
 	}
 
-	volume, err := d.getOrCreateVolume(ctx, scwVolumeName, snapshotID, size, perfIOPS, chosenZones)
+	volume, err := d.getOrCreateVolume(ctx, scwVolumeName, snapshotID, size, perfIOPS, chosenZones, kmsKeyID)
 	if err != nil {
 		return nil, status.Errorf(codeFromScalewayError(err), "could not get or create volume: %s", err)
 	}
@@ -132,6 +134,10 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 	cv := csiVolume(volume)
 	cv.VolumeContext = map[string]string{
 		encryptedKey: strconv.FormatBool(encrypted),
+	}
+
+	if kmsKeyID != nil {
+		cv.VolumeContext[kmsKeyIDKey] = kmsKeyID.String()
 	}
 
 	return &csi.CreateVolumeResponse{

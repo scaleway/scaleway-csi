@@ -155,7 +155,7 @@ func (f *Fake) CreateSnapshot(ctx context.Context, name string, volumeID string,
 	return snapshot, nil
 }
 
-func (f *Fake) CreateVolume(ctx context.Context, name string, snapshotID string, size int64, perfIOPS *uint32, zone scw.Zone) (*block.Volume, error) {
+func (f *Fake) CreateVolume(ctx context.Context, name string, snapshotID string, size int64, perfIOPS *uint32, zone scw.Zone, kmsKeyID *uuid.UUID) (*block.Volume, error) {
 	f.mux.Lock()
 	defer f.mux.Unlock()
 
