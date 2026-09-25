@@ -101,15 +101,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Errorf(codes.InvalidArgument, "%s not found in publish context of volume %s", scwVolumeIDKey, volumeID)
 	}
 
-	devicePath, err := d.diskUtils.GetDevicePath(scwVolumeID)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, status.Errorf(codes.NotFound, "volume %s is not mounted on node yet", volumeID)
-		}
-		return nil, status.Errorf(codes.Internal, "error getting device path for volume with ID %s: %s", volumeID, err.Error())
-	}
-	klog.V(4).Infof("volume %s with ID %s has device path %s", volumeName, volumeID, devicePath)
-
+	var devicePath string
 	if encrypted {
 		passphrase, ok := req.GetSecrets()[encryptionPassphraseKey]
 		if !ok {
@@ -117,9 +109,21 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 		devicePath, err = d.diskUtils.EncryptAndOpenDevice(scwVolumeID, passphrase)
 		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil, status.Errorf(codes.NotFound, "volume %s is not mounted on node yet", volumeID)
+			}
 			return nil, status.Errorf(codes.Internal, "error encrypting/opening volume with ID %s: %s", volumeID, err.Error())
 		}
+	} else { // em encryptionModeKms is handle on block side
+		devicePath, err = d.diskUtils.GetDevicePath(scwVolumeID)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil, status.Errorf(codes.NotFound, "volume %s is not mounted on node yet", volumeID)
+			}
+			return nil, status.Errorf(codes.Internal, "error getting device path for volume with ID %s: %s", volumeID, err.Error())
+		}
 	}
+	klog.V(4).Infof("volume %s with ID %s has device path %s", volumeName, volumeID, devicePath)
 
 	if block {
 		return &csi.NodeStageVolumeResponse{}, nil
@@ -257,20 +261,21 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Errorf(codes.InvalidArgument, "%s not provided in publishContext", scwVolumeNameKey)
 	}
 
-	devicePath, err := d.diskUtils.GetDevicePath(scwVolumeID)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "volume %s not found: %s", volumeID, err.Error())
-	}
-
 	encrypted, err := isVolumeEncrypted(req.GetVolumeContext())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid volumeContext: %s", err)
 	}
 
+	var devicePath string
 	if encrypted {
 		devicePath, err = d.diskUtils.GetMappedDevicePath(scwVolumeID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "error getting mapped device for encrypted device %s: %s", devicePath, err.Error())
+		}
+	} else { // em encryptionModeKms is handle on block side
+		devicePath, err = d.diskUtils.GetDevicePath(scwVolumeID)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "volume %s not found: %s", volumeID, err.Error())
 		}
 	}
 
