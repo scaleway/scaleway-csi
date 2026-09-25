@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	block "github.com/scaleway/scaleway-sdk-go/api/block/v1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 )
@@ -16,7 +17,7 @@ const InstanceServerProductResourceType = "instance_server"
 // It returns ErrVolumeDifferentSize if the volume does not have the expected size.
 func (s *Scaleway) GetVolumeByName(ctx context.Context, name string, size scw.Size, zone scw.Zone) (*block.Volume, error) {
 	volumesResp, err := s.block.ListVolumes(&block.ListVolumesRequest{
-		Name: scw.StringPtr(name),
+		Name: new(name),
 		Zone: zone,
 	}, scw.WithContext(ctx), scw.WithAllPages())
 	if err != nil {
@@ -39,7 +40,7 @@ func (s *Scaleway) GetVolumeByName(ctx context.Context, name string, size scw.Si
 // GetSnapshotByName is a helper to find a snapshot by its name, its sourceVolumeID and zone.
 func (s *Scaleway) GetSnapshotByName(ctx context.Context, name string, sourceVolumeID string, zone scw.Zone) (*block.Snapshot, error) {
 	snapshotsResp, err := s.block.ListSnapshots(&block.ListSnapshotsRequest{
-		Name: scw.StringPtr(name),
+		Name: new(name),
 		Zone: zone,
 	}, scw.WithContext(ctx), scw.WithAllPages())
 	if err != nil {
@@ -63,8 +64,8 @@ func (s *Scaleway) GetSnapshotByName(ctx context.Context, name string, sourceVol
 func (s *Scaleway) ListVolumes(ctx context.Context, start, max uint32) ([]*block.Volume, string, error) {
 	return paginatedList(func(page int32, pageSize uint32) ([]*block.Volume, error) {
 		volumesResp, err := s.block.ListVolumes(&block.ListVolumesRequest{
-			Page:     scw.Int32Ptr(page),
-			PageSize: scw.Uint32Ptr(pageSize),
+			Page:     new(page),
+			PageSize: new(pageSize),
 			Zone:     scw.ZoneFrPar1, // Do not remove this, it's needed for zones that are not part of the SDK.
 		}, scw.WithContext(ctx), scw.WithZones(s.zones...))
 		if err != nil {
@@ -80,8 +81,8 @@ func (s *Scaleway) ListVolumes(ctx context.Context, start, max uint32) ([]*block
 func (s *Scaleway) ListSnapshots(ctx context.Context, start, max uint32) ([]*block.Snapshot, string, error) {
 	return paginatedList(func(page int32, pageSize uint32) ([]*block.Snapshot, error) {
 		snapshotsResp, err := s.block.ListSnapshots(&block.ListSnapshotsRequest{
-			Page:     scw.Int32Ptr(page),
-			PageSize: scw.Uint32Ptr(pageSize),
+			Page:     new(page),
+			PageSize: new(pageSize),
 			Zone:     scw.ZoneFrPar1, // Do not remove this, it's needed for zones that are not part of the SDK.
 		}, scw.WithContext(ctx), scw.WithZones(s.zones...))
 		if err != nil {
@@ -108,9 +109,9 @@ func (s *Scaleway) ListSnapshotsBySourceVolume(
 
 	return paginatedList(func(page int32, pageSize uint32) ([]*block.Snapshot, error) {
 		snapshotsResp, err := s.block.ListSnapshots(&block.ListSnapshotsRequest{
-			Page:     scw.Int32Ptr(page),
-			PageSize: scw.Uint32Ptr(pageSize),
-			VolumeID: scw.StringPtr(sourceVolumeID),
+			Page:     new(page),
+			PageSize: new(pageSize),
+			VolumeID: new(sourceVolumeID),
 			Zone:     sourceVolumeZone,
 		}, scw.WithContext(ctx))
 		if err != nil {
@@ -207,7 +208,7 @@ func (s *Scaleway) ResizeVolume(ctx context.Context, volumeID string, zone scw.Z
 	if _, err := s.block.UpdateVolume(&block.UpdateVolumeRequest{
 		VolumeID: volumeID,
 		Zone:     zone,
-		Size:     scw.SizePtr(scwSize),
+		Size:     new(scwSize),
 	}, scw.WithContext(ctx)); err != nil {
 		return fmt.Errorf("failed to update volume with new size: %w", err)
 	}
@@ -230,7 +231,8 @@ func (s *Scaleway) ResizeVolume(ctx context.Context, volumeID string, zone scw.Z
 // CreateVolume creates a volume with the given parameters. If snapshotID is not
 // empty, the size parameter is ignored and the volume is created from the snapshot.
 // If perfIOPS is nil, the block API will decide how many iops are associated to the volume.
-func (s *Scaleway) CreateVolume(ctx context.Context, name, snapshotID string, size int64, perfIOPS *uint32, zone scw.Zone) (*block.Volume, error) {
+// If kmsKeyID is defined the volume is remotely encrypted
+func (s *Scaleway) CreateVolume(ctx context.Context, name string, snapshotID string, size int64, perfIOPS *uint32, zone scw.Zone, kmsKeyID *uuid.UUID) (*block.Volume, error) {
 	req := &block.CreateVolumeRequest{
 		Name:     name,
 		PerfIops: perfIOPS,
@@ -249,12 +251,17 @@ func (s *Scaleway) CreateVolume(ctx context.Context, name, snapshotID string, si
 
 		req.FromSnapshot = &block.CreateVolumeRequestFromSnapshot{
 			SnapshotID: snapshotID,
-			Size:       scw.SizePtr(scwSize),
+			Size:       new(scwSize),
 		}
 	} else {
 		req.FromEmpty = &block.CreateVolumeRequestFromEmpty{
 			Size: scwSize,
 		}
+	}
+
+	if kmsKeyID != nil {
+		kmsKey := kmsKeyID.String()
+		req.KmsKeyID = &kmsKey
 	}
 
 	volume, err := s.block.CreateVolume(req, scw.WithContext(ctx))

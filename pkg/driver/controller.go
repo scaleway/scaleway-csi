@@ -26,12 +26,14 @@ const (
 	volumeTypeKey = "type"
 	// encryptedKey is the key of the encrypted parameter.
 	encryptedKey = "encrypted"
+	// kmsKeyIDKey is the key of the kms key id parameter.
+	kmsKeyIDKey = "kmskeyid"
 	// volumeIOPSKey is the key of the iops parameter.
 	volumeIOPSKey = "iops"
 )
 
 var (
-	// controllerCapabilities represents the capabilites of the controller.
+	// controllerCapabilities represents the capabilities of the controller.
 	controllerCapabilities = []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
@@ -90,7 +92,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.InvalidArgument, "volumeCapabilities not supported: %s", err)
 	}
 
-	perfIOPS, encrypted, err := parseCreateVolumeParams(req.GetParameters())
+	perfIOPS, encrypted, kmsKeyID, err := parseCreateVolumeParams(req.GetParameters())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid parameters: %s:", err)
 	}
@@ -124,7 +126,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.InvalidArgument, "unable to choose zone from accessibilityRequirements: %s", err)
 	}
 
-	volume, err := d.getOrCreateVolume(ctx, scwVolumeName, snapshotID, size, perfIOPS, chosenZones)
+	volume, err := d.getOrCreateVolume(ctx, scwVolumeName, snapshotID, size, perfIOPS, chosenZones, kmsKeyID)
 	if err != nil {
 		return nil, status.Errorf(codeFromScalewayError(err), "could not get or create volume: %s", err)
 	}
@@ -132,6 +134,10 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 	cv := csiVolume(volume)
 	cv.VolumeContext = map[string]string{
 		encryptedKey: strconv.FormatBool(encrypted),
+	}
+
+	if kmsKeyID != nil {
+		cv.VolumeContext[kmsKeyIDKey] = kmsKeyID.String()
 	}
 
 	return &csi.CreateVolumeResponse{
@@ -510,7 +516,7 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 		return nil, status.Errorf(codes.OutOfRange, "capacityRange invalid: %s", err)
 	}
 
-	if volumeSize := scwSizetoInt64(volumeResp.Size); volumeSize >= newSize {
+	if volumeSize := scwSizeToInt64(volumeResp.Size); volumeSize >= newSize {
 		// Volume is already larger than or equal to the target capacity.
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: volumeSize, NodeExpansionRequired: nodeExpansionRequired}, nil
 	}
