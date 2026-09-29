@@ -254,16 +254,19 @@ parameters:
 
 ## Encrypting Volumes
 
-This plugin supports at rest encryption of the volumes with Cryptsetup/LUKS.
+This plugin supports at rest encryption of the volumes with Cryptsetup/LUKS or [Scaleway Key Manager Service](https://www.scaleway.com/en/docs/key-manager/).
 
 ### Storage Class parameters
 
-In order to have an encrypted volume, `encrypted: true` needs to be added to the
-StorageClass parameters. You will also need a passphrase to encrypt/decrypt the volume,
-which is taken from the secrets passed to the `NodeStageVolume` and `NodeExpandVolume` method.
+In order to have an encrypted volume, two methods are available.
+
+### Cryptsetup/LUKS
+
+Parameter `encrypted: true` needs to be added to the StorageClass parameters.
+You will also need a passphrase to encrypt/decrypt the volume,
 
 The [external-provisioner](https://github.com/kubernetes-csi/external-provisioner)
-can be used to [pass down the wanted secret to the CSI plugin](https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html) (v1.0.1+).
+is used to pass down the wanted secret to the [CSI plugin](https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html) (v1.0.1+).
 
 Some additional parameters are needed on the StorageClass:
 
@@ -293,8 +296,6 @@ data:
 and the following StorageClass:
 
 ```yaml
-# Volume expansion is supported with CSINodeExpandSecret feature gate since v1.25.0 or by default since v1.27.0
-allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -302,6 +303,8 @@ metadata:
 provisioner: csi.scaleway.com
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
+# Volume expansion is supported with CSINodeExpandSecret feature gate since v1.25.0 or by default since v1.27.0
+allowVolumeExpansion: true
 parameters:
   encrypted: "true"
   csi.storage.k8s.io/node-stage-secret-name: "enc-secret"
@@ -317,9 +320,45 @@ rest with the passphrase `myawesomepassphrase`.
 The [Per Volume Secret](https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html#per-volume-secrets)
 can also be used to avoid having one passphrase per StorageClass.
 
-> **Note**
+> [!NOTE]
 > Please note that prior to `v0.2.1` the expansion of encrypted volume was not possible,
 > `PersistentVolumes` created without the `csi.storage.k8s.io/node-stage-secret` annotations
 > will need to be patched manually if expansion is needed. Be sure to be extra careful doing
 > so as the needed fields are immutable and you'll need to force the patch (backup any data,
 > switch the `reclaimPolicy` of the volume to `Retain`, etc.).
+
+### Scaleway Key Manager
+
+Prerequisites:
+
+For the following step you will need to :
+- [create a Key Manager Key](https://www.scaleway.com/en/docs/key-manager/quickstart/#how-to-create-a-key-manager-key),
+- [create a policy](https://www.scaleway.com/en/docs/iam/policies-permissions/create-policy) with permission `KeyManagerKeyEncrypt` on the concerned KMS,
+- for managed kapsule cluster attach the policy to the [IAM application](https://www.scaleway.com/en/docs/iam/how-to/create-application) of your cluster's control plane,
+- for self hosted csi deployment attach the policy to the API Key [use during deployment](https://github.com/scaleway/scaleway-csi/tree/master#installation),
+
+> [!NOTE]
+> we recommend to scope the policy with [resources level condition](https://www.scaleway.com/en/docs/iam/policies-permissions/understanding-resource-level-conditions)
+
+On the storage class side the parameter `kmsKeyId` needs to be added to the StorageClass parameters.
+
+For instance with the following `StorageClass`:
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "sbs-default-kms-enc"
+provisioner: csi.scaleway.com
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  encrypted: "true"
+  kmsKeyId: "22222222-2222-2222-2222-222222222222"
+```
+
+all the PVC created with the StorageClass `sbs-default-kms-enc` will be encrypted at
+rest with a key derived from the KMS key id `22222222-2222-2222-2222-222222222222`.
+
+> [!NOTE]
+> passing `encrypted: false` and a `kmsKeyId` will result in an error
