@@ -713,7 +713,7 @@ func Test_validateVolumeCapabilities(t *testing.T) {
 	}
 }
 
-func Test_isVolumeEncrypted(t *testing.T) {
+func Test_isVolumeLuksEncrypted(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		volumeContext map[string]string
@@ -725,13 +725,25 @@ func Test_isVolumeEncrypted(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "volume should be encrypted",
+			name: "volume is luks encrypted",
 			args: args{
 				volumeContext: map[string]string{
-					encryptedKey: "true",
+					encryptedKey:   "true",
+					encryptionMode: "passphrase",
 				},
 			},
 			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "volume is not luks encrypted",
+			args: args{
+				volumeContext: map[string]string{
+					encryptedKey:   "true",
+					encryptionMode: "kms",
+				},
+			},
+			want:    false,
 			wantErr: false,
 		},
 		{
@@ -767,7 +779,7 @@ func Test_isVolumeEncrypted(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := isVolumeEncrypted(tt.args.volumeContext)
+			got, err := isVolumeLuksEncrypted(tt.args.volumeContext)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("isVolumeEncrypted() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -909,11 +921,14 @@ func Test_parseCreateVolumeParams(t *testing.T) {
 	type args struct {
 		params map[string]string
 	}
+	fakeKMSID := "aef7da4f-8b61-4906-b705-98d0285fe78e"
+
 	tests := []struct {
 		name    string
 		args    args
 		want    *uint32
 		want1   bool
+		want2   *string
 		wantErr bool
 	}{
 		{
@@ -967,6 +982,42 @@ func Test_parseCreateVolumeParams(t *testing.T) {
 			},
 			want:    nil,
 			want1:   false,
+			wantErr: true,
+		},
+		{
+			name: "kms key ID defined",
+			args: args{
+				params: map[string]string{
+					kmsKeyIDKey: "aef7da4f-8b61-4906-b705-98d0285fe78e",
+				},
+			},
+			want:    nil,
+			want1:   false,
+			want2:   &fakeKMSID,
+			wantErr: false,
+		},
+		{
+			name: "encrypted and kms key ID defined",
+			args: args{
+				params: map[string]string{
+					encryptedKey: "true",
+					kmsKeyIDKey:  "aef7da4f-8b61-4906-b705-98d0285fe78e",
+				},
+			},
+			want:    nil,
+			want1:   true,
+			want2:   &fakeKMSID,
+			wantErr: false,
+		},
+		{
+			name: "not encrypted and kms key ID defined",
+			args: args{
+				params: map[string]string{
+					encryptedKey: "false",
+					kmsKeyIDKey:  "aef7da4f-8b61-4906-b705-98d0285fe78e",
+				},
+			},
+			want:    nil,
 			wantErr: true,
 		},
 		{
@@ -1043,7 +1094,7 @@ func Test_parseCreateVolumeParams(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, got1, err := parseCreateVolumeParams(tt.args.params)
+			got, got1, got2, err := parseCreateVolumeParams(tt.args.params)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseCreateVolumeParams() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1053,6 +1104,9 @@ func Test_parseCreateVolumeParams(t *testing.T) {
 			}
 			if got1 != tt.want1 {
 				t.Errorf("parseCreateVolumeParams() got1 = %v, want %v", got1, tt.want1)
+			}
+			if !reflect.DeepEqual(got2, tt.want2) {
+				t.Errorf("parseCreateVolumeParams() got2 = %v, want %v", got2, tt.want2)
 			}
 		})
 	}

@@ -71,7 +71,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Errorf(codes.InvalidArgument, "invalid parameter volumeID: %s", err)
 	}
 
-	encrypted, err := isVolumeEncrypted(req.GetVolumeContext())
+	isLuksEncrypted, err := isVolumeLuksEncrypted(req.GetVolumeContext())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid volumeContext: %s", err)
 	}
@@ -102,7 +102,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	var devicePath string
-	if encrypted {
+	if isLuksEncrypted {
 		passphrase, ok := req.GetSecrets()[encryptionPassphraseKey]
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "missing passphrase secret for key %s", encryptionPassphraseKey)
@@ -261,13 +261,13 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Errorf(codes.InvalidArgument, "%s not provided in publishContext", scwVolumeNameKey)
 	}
 
-	encrypted, err := isVolumeEncrypted(req.GetVolumeContext())
+	isLuksEncrypted, err := isVolumeLuksEncrypted(req.GetVolumeContext())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid volumeContext: %s", err)
 	}
 
 	var devicePath string
-	if encrypted {
+	if isLuksEncrypted {
 		devicePath, err = d.diskUtils.GetMappedDevicePath(scwVolumeID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "error getting mapped device for encrypted device %s: %s", devicePath, err.Error())

@@ -230,11 +230,13 @@ func (s *Scaleway) ResizeVolume(ctx context.Context, volumeID string, zone scw.Z
 // CreateVolume creates a volume with the given parameters. If snapshotID is not
 // empty, the size parameter is ignored and the volume is created from the snapshot.
 // If perfIOPS is nil, the block API will decide how many iops are associated to the volume.
-func (s *Scaleway) CreateVolume(ctx context.Context, name, snapshotID string, size int64, perfIOPS *uint32, zone scw.Zone) (*block.Volume, error) {
+// If kmsKeyID is defined the volume is remotely encrypted
+func (s *Scaleway) CreateVolume(ctx context.Context, name string, snapshotID string, size int64, perfIOPS *uint32, zone scw.Zone, kmsKeyID *string) (*block.Volume, error) {
 	req := &block.CreateVolumeRequest{
 		Name:     name,
 		PerfIops: perfIOPS,
 		Zone:     zone,
+		KmsKeyID: kmsKeyID,
 	}
 
 	scwSize, err := NewSize(size)

@@ -12,7 +12,7 @@ import (
 type Interface interface {
 	AttachVolume(ctx context.Context, serverID string, volumeID string, zone scw.Zone) error
 	CreateSnapshot(ctx context.Context, name string, volumeID string, zone scw.Zone) (*block.Snapshot, error)
-	CreateVolume(ctx context.Context, name string, snapshotID string, size int64, perfIOPS *uint32, zone scw.Zone) (*block.Volume, error)
+	CreateVolume(ctx context.Context, name string, snapshotID string, size int64, perfIOPS *uint32, zone scw.Zone, kmsKeyID *string) (*block.Volume, error)
 	DeleteSnapshot(ctx context.Context, snapshotID string, zone scw.Zone) error
 	DeleteVolume(ctx context.Context, volumeID string, zone scw.Zone) error
 	DetachVolume(ctx context.Context, volumeID string, zone scw.Zone) error

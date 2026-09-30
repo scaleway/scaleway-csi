@@ -48,8 +48,8 @@ func Test_NodeStageVolume(t *testing.T) {
 					},
 				},
 				VolumeContext: map[string]string{
-					encryptedKey: "true",
-					kmsKeyIDKey:  "8c9cf1cf-b38e-4f1b-b870-ae640fefc2a6",
+					encryptedKey:   "true",
+					encryptionMode: "kms",
 				},
 			},
 			wantErrCode: codes.NotFound,
