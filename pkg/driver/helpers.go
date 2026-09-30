@@ -292,7 +292,7 @@ func stripSecretFromReq(req any) string {
 }
 
 // getOrCreateVolume gets a volume by name or creates it if it does not exist.
-func (d *controllerService) getOrCreateVolume(ctx context.Context, name, snapshotID string, size int64, perfIOPS *uint32, zones []scw.Zone) (*block.Volume, error) {
+func (d *controllerService) getOrCreateVolume(ctx context.Context, name, snapshotID string, size int64, perfIOPS *uint32, zones []scw.Zone, kmsKeyID *string) (*block.Volume, error) {
 	if len(zones) == 0 {
 		zones = append(zones, scw.Zone(""))
 	}
@@ -316,7 +316,7 @@ func (d *controllerService) getOrCreateVolume(ctx context.Context, name, snapsho
 
 	var errs []error
 	for _, zone := range zones {
-		volume, err := d.scaleway.CreateVolume(ctx, name, snapshotID, size, perfIOPS, zone)
+		volume, err := d.scaleway.CreateVolume(ctx, name, snapshotID, size, perfIOPS, zone, kmsKeyID)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -355,8 +355,10 @@ func (d *controllerService) getOrCreateSnapshot(ctx context.Context, name, sourc
 // parseCreateVolumeParams parses the params sent by the client during the
 // creation of a volume. It returns the requested number of IOPS if specified.
 // The second return value is true if the volume should be encrypted.
-func parseCreateVolumeParams(params map[string]string) (*uint32, bool, error) {
+// The third value is the kms id to encrypt the volume remotely
+func parseCreateVolumeParams(params map[string]string) (*uint32, bool, *string, error) {
 	var (
+		kmsKeyID   *string
 		encrypted  bool
 		perfIOPS   *uint32
 		volumeType string
@@ -366,38 +368,43 @@ func parseCreateVolumeParams(params map[string]string) (*uint32, bool, error) {
 		switch strings.ToLower(key) {
 		case volumeTypeKey:
 			if value != scaleway.LegacyDefaultVolumeType {
-				return nil, false, fmt.Errorf("invalid value (%s) for parameter %s: unknown volume type", value, key)
+				return nil, false, nil, fmt.Errorf("invalid value (%s) for parameter %s: unknown volume type", value, key)
 			}
 
 			volumeType = value
 		case encryptedKey:
 			encryptedValue, err := strconv.ParseBool(value)
 			if err != nil {
-				return nil, false, fmt.Errorf("invalid bool value (%s) for parameter %s: %s", value, key, err)
+				return nil, false, nil, fmt.Errorf("invalid bool value (%s) for parameter %s: %s", value, key, err)
 			}
 			encrypted = encryptedValue
-
+		case kmsKeyIDKey:
+			kmsKeyID = &value
 		case volumeIOPSKey:
 			iops, err := strconv.ParseUint(value, 10, 0)
 			if err != nil {
-				return nil, false, fmt.Errorf("invalid value (%s) for parameter %s: %s", value, key, err)
+				return nil, false, nil, fmt.Errorf("invalid value (%s) for parameter %s: %s", value, key, err)
 			}
 
-			perfIOPS = scw.Uint32Ptr(uint32(iops))
+			perfIOPS = new(uint32(iops))
 		default:
-			return nil, false, fmt.Errorf("invalid parameter key %s", key)
+			return nil, false, nil, fmt.Errorf("invalid parameter key %s", key)
 		}
 	}
 
 	// Params are invalid if LegacyDefaultVolumeType is set but number of IOPS is
-	// different than what is supported.
+	// different from what is supported.
 	if volumeType == scaleway.LegacyDefaultVolumeType && perfIOPS != nil &&
 		*perfIOPS != scaleway.LegacyDefaultVolumeTypeIOPS {
-		return nil, false, fmt.Errorf("volume type %s only supports %d iops",
+		return nil, false, nil, fmt.Errorf("volume type %s only supports %d iops",
 			scaleway.LegacyDefaultVolumeType, scaleway.LegacyDefaultVolumeTypeIOPS)
 	}
 
-	return perfIOPS, encrypted, nil
+	if _, ok := params[encryptedKey]; ok && !encrypted && kmsKeyID != nil {
+		return nil, false, nil, fmt.Errorf("kmsKeyId (%s) provided for unencrypted volume (%t)", *kmsKeyID, encrypted)
+	}
+
+	return perfIOPS, encrypted, kmsKeyID, nil
 }
 
 // csiVolume returns a CSI Volume from a Scaleway Volume spec.
@@ -415,7 +422,7 @@ func csiVolume(volume *block.Volume) *csi.Volume {
 
 	return &csi.Volume{
 		VolumeId:      expandZonalID(volume.ID, volume.Zone),
-		CapacityBytes: scwSizetoInt64(volume.Size),
+		CapacityBytes: scwSizeToInt64(volume.Size),
 		AccessibleTopology: []*csi.Topology{
 			{
 				Segments: map[string]string{ZoneTopologyKey: volume.Zone.String()},
@@ -444,7 +451,7 @@ func publishedNodeIDs(volume *block.Volume) []string {
 // csiSnapshot returns a CSI Snapshot from a Snapshot.
 func csiSnapshot(snapshot *block.Snapshot) *csi.Snapshot {
 	snap := &csi.Snapshot{
-		SizeBytes:  scwSizetoInt64(snapshot.Size),
+		SizeBytes:  scwSizeToInt64(snapshot.Size),
 		SnapshotId: expandZonalID(snapshot.ID, snapshot.Zone),
 		ReadyToUse: snapshot.Status == block.SnapshotStatusAvailable,
 	}
@@ -474,14 +481,18 @@ func parseStartingToken(token string) (uint32, error) {
 	return uint32(start), nil
 }
 
-// isVolumeEncrypted returns true if the volume context specifies that the volume
-// should be encrypted.
-func isVolumeEncrypted(volumeContext map[string]string) (bool, error) {
+// isVolumeLuksEncrypted returns true if the volume context specifies that the volume
+// should be encrypted locally with luks.
+func isVolumeLuksEncrypted(volumeContext map[string]string) (bool, error) {
 	encrypted := false
 	if encryptedValueString, ok := volumeContext[encryptedKey]; ok {
 		encryptedValue, err := strconv.ParseBool(encryptedValueString)
 		if err != nil {
 			return false, fmt.Errorf("failed to check if volume is encrypted from volume context: %w", err)
+		}
+
+		if em := volumeContext["encryptionMode"]; em == "kms" {
+			return false, nil
 		}
 
 		encrypted = encryptedValue
@@ -508,8 +519,8 @@ func codeFromScalewayError(err error) codes.Code {
 	}
 }
 
-// scwSizetoInt64 converts an scw.Size to int64. It panics if the size exceeds math.MaxInt64.
-func scwSizetoInt64(s scw.Size) int64 {
+// scwSizeToInt64 converts an scw.Size to int64. It panics if the size exceeds math.MaxInt64.
+func scwSizeToInt64(s scw.Size) int64 {
 	return uint64ToInt64(uint64(s))
 }
 
@@ -539,7 +550,7 @@ func attachedScratchVolumes(md *instance.Metadata) int {
 }
 
 // maxVolumesPerNode returns the maximum number of volumes that can be attached to a node,
-// after substracting the system root volume and the provided number of reserved volumes.
+// after subtracting the system root volume and the provided number of reserved volumes.
 // It returns an error if the result is 0 or less.
 func maxVolumesPerNode(reservedCount int) (int64, error) {
 	max := scaleway.MaxVolumesPerNode - reservedCount - 1
