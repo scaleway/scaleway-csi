@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"slices"
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -253,8 +254,12 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 		return nil, status.Errorf(code, "failed to get volume to unpublish: %s", err)
 	}
 
-	// Skip if volume is not attached.
-	if len(publishedNodeIDs(volume)) == 0 {
+	// Skip if volume is not attached to this node. DetachVolume detaches the
+	// volume from whichever server holds it, so without this check a request
+	// for a node the volume has already left (e.g. a stale VolumeAttachment
+	// cleaned up after the volume was published elsewhere) would detach it
+	// from the node currently using it.
+	if !slices.Contains(publishedNodeIDs(volume), expandZonalID(nodeID, nodeZone)) {
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
